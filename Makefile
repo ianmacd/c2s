@@ -325,7 +325,8 @@ ARCH		?= $(SUBARCH)
 UTS_MACHINE 	:= $(ARCH)
 SRCARCH 	:= $(ARCH)
 
-CROSS_COMPILE := ./toolchain/gcc-cfp/gcc-cfp-jopp-only/aarch64-linux-android-4.9/bin/aarch64-linux-android-
+#CROSS_COMPILE := ./toolchain/gcc-cfp/gcc-cfp-jopp-only/aarch64-linux-android-4.9/bin/aarch64-linux-android-
+CROSS_COMPILE   ?= $(CONFIG_CROSS_COMPILE:"%"=%)
 CC := ./toolchain/clang/host/linux-x86/clang-r349610-jopp/bin/clang
 CLANG_TRIPLE := ./toolchain/clang/host/linux-x86/clang-r349610-jopp/bin/aarch64-linux-gnu-
 
