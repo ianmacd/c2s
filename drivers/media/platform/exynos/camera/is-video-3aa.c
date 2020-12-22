@@ -798,7 +798,7 @@ static int is_3aa_video_s_ext_ctrl(struct file *file, void *priv,
 					(struct fast_ctl_capture *)&device->is_region->fast_ctl.fast_capture;
 				ret = copy_from_user(fast_capture, ext_ctrl->ptr, sizeof(struct fast_ctl_capture));
 				if (ret) {
-					merr("copy_from_user is fail(%d)", 
+					merr("copy_from_user is fail(%d)",
 								device, ret);
 					goto p_err;
 				}
@@ -861,8 +861,8 @@ static int is_3aa_video_s_ext_ctrl(struct file *file, void *priv,
 				head->remainIntentCount = 0 + INTENT_RETRY_CNT;
 			}
 
-			info("s_ext_ctrl SET_CAPTURE_INTENT_INFO, intent(%d) count(%d) captureEV(%d) remainIntentCount(%d)\n",
-				info.captureIntent, info.captureCount, info.captureEV, head->remainIntentCount);
+			info("[%d]s_ext_ctrl SET_CAPTURE_INTENT_INFO, intent(%d) count(%d) captureEV(%d) remainIntentCount(%d)\n",
+				head->instance, info.captureIntent, info.captureCount, info.captureEV, head->remainIntentCount);
 			break;
 		}
 		default:

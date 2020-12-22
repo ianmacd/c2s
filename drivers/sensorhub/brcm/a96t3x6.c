@@ -854,10 +854,54 @@ static ssize_t grip_raw_show(struct device *dev,
 				data->grip_raw_d);
 }
 
+static ssize_t grip_ref_cap_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct a96t3x6_data *data = dev_get_drvdata(dev);
+	u8 r_buf[2];
+	int ref_cap;
+	int ret;
+
+	ret = a96t3x6_i2c_read(data->client, REG_REF_CAP, r_buf, 2);
+	if (ret < 0) {
+		GRIP_ERR("fail(%d)\n", ret);
+		return snprintf(buf, PAGE_SIZE, "%d\n", 0);
+	}
+
+	ref_cap = (r_buf[0] << 8) | r_buf[1];
+	do_div(ref_cap, 100);
+
+	GRIP_INFO("Ref Cap : %x,%x\n", r_buf[0], r_buf[1]);
+	GRIP_INFO("Ref Cap / 100 : %d\n", ref_cap);
+
+	return sprintf(buf, "%d\n", ref_cap);
+}
+
 static ssize_t grip_gain_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%d,%d,%d,%d\n", 0, 0, 0, 0);
+	struct a96t3x6_data *data = dev_get_drvdata(dev);
+	u8 r_buf1[3], r_buf2[3];
+	int ret;
+
+	ret = a96t3x6_i2c_read(data->client, REG_GAINDATA, r_buf1, 3);
+	if (ret < 0) {
+		GRIP_ERR("fail(%d)\n", ret);
+		return snprintf(buf, PAGE_SIZE, "%d\n", 0);
+	}
+
+	GRIP_INFO("Gain : %d,%d,%d\n", (int)r_buf1[0], (int)r_buf1[1], (int)r_buf1[2]);
+
+	ret = a96t3x6_i2c_read(data->client, REG_REF_GAINDATA, r_buf2, 3);
+	if (ret < 0) {
+		GRIP_ERR("fail(%d)\n", ret);
+		return snprintf(buf, PAGE_SIZE, "%d\n", 0);
+	}
+
+	GRIP_INFO("Ref Gain : %d,%d,%d\n", (int)r_buf2[0], (int)r_buf2[1], (int)r_buf2[2]);
+
+	return sprintf(buf, "%d,%d,%d,%d,%d,%d\n", (int)r_buf1[0], (int)r_buf1[1], (int)r_buf1[2],
+	                                           (int)r_buf2[0], (int)r_buf2[1], (int)r_buf2[2]);
 }
 
 static ssize_t grip_check_show(struct device *dev,
@@ -1830,6 +1874,7 @@ static DEVICE_ATTR(grip_earjack, 0220, NULL, grip_sensing_change);
 static DEVICE_ATTR(grip, 0444, grip_show, NULL);
 static DEVICE_ATTR(grip_baseline, 0444, grip_baseline_show, NULL);
 static DEVICE_ATTR(grip_raw, 0444, grip_raw_show, NULL);
+static DEVICE_ATTR(grip_ref_cap, 0444, grip_ref_cap_show, NULL);
 static DEVICE_ATTR(grip_gain, 0444, grip_gain_show, NULL);
 static DEVICE_ATTR(grip_check, 0444, grip_check_show, NULL);
 #ifndef CONFIG_SAMSUNG_PRODUCT_SHIP
@@ -1864,6 +1909,7 @@ static struct device_attribute *grip_sensor_attributes[] = {
 	&dev_attr_grip,
 	&dev_attr_grip_baseline,
 	&dev_attr_grip_raw,
+	&dev_attr_grip_ref_cap,
 	&dev_attr_grip_gain,
 	&dev_attr_grip_check,
 #ifndef CONFIG_SAMSUNG_PRODUCT_SHIP

@@ -210,6 +210,11 @@ enum {
 	PANEL_CONNECT = 1,
 };
 
+enum {
+	PANEL_PCD_BYPASS_OFF = 0,
+	PANEL_PCD_BYPASS_ON = 1,
+};
+
 #define ALPM_MODE	0
 #define HLPM_MODE	1
 
@@ -273,6 +278,7 @@ struct panel_state {
 	int hmd_on;
 #endif
 	int lpm_brightness;
+	int pcd_bypass;
 };
 
 struct copr_spi_gpios {
@@ -552,6 +558,12 @@ int panel_seq_set_alpm(struct panel_device *panel);
 #endif
 #if defined(CONFIG_PANEL_DISPLAY_MODE)
 int panel_display_mode_cb(struct panel_device *panel);
+int panel_update_display_mode(struct panel_device *panel);
+int find_panel_mode_by_common_panel_display_mode(struct panel_device *panel,
+		struct common_panel_display_mode *cpdm);
+int panel_display_mode_find_panel_mode(struct panel_device *panel,
+		struct panel_display_mode *pdm);
+int panel_set_display_mode_nolock(struct panel_device *panel, int panel_mode);
 #endif
 
 #if defined(CONFIG_SEC_FACTORY) && defined(CONFIG_SUPPORT_FAST_DISCHARGE)
@@ -607,5 +619,6 @@ int panel_fast_discharge_set(struct panel_device *panel);
 
 #define PANEL_IOC_GET_DF_STATUS			_IOR(PANEL_IOC_BASE, 85, int *)
 #define PANEL_IOC_DYN_FREQ_FFC			_IOR(PANEL_IOC_BASE, 82, int *)
+#define PANEL_IOC_DYN_FREQ_FFC_OFF			_IOR(PANEL_IOC_BASE, 83, int *)
 #endif
 #endif //__PANEL_DRV_H__

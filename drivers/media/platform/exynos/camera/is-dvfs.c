@@ -267,7 +267,8 @@ int is_dvfs_sel_static(struct is_device_ischain *device)
 	resol = is_get_target_resol(device);
 #endif
 
-	dbg_dvfs(1, "pos(%d), res(%d), fps(%d), sc(%d, %d), map(%d), dual(%d, %d, %d, %d, %d)(%d), setfile(%d)\n",
+	dbg_dvfs(1, "pos(%d), res(%d), fps(%d), sc(%d, %d), map(%d), dual(%d, %d, %d, %d, %d)(%d), setfile(%d),\
+		limited_fps(%d)\n",
 		device,	position, resol, fps, stream_cnt, streaming_cnt, sensor_map,
 		dual_info->max_fps[SENSOR_POSITION_REAR],
 		dual_info->max_fps[SENSOR_POSITION_REAR2],
@@ -275,7 +276,8 @@ int is_dvfs_sel_static(struct is_device_ischain *device)
 		dual_info->max_fps[SENSOR_POSITION_FRONT],
 		dual_info->max_fps[SENSOR_POSITION_REAR_TOF],
 		dual_info->mode,
-		(device->setfile & IS_SETFILE_MASK));
+		(device->setfile & IS_SETFILE_MASK),
+		resourcemgr->limited_fps);
 
 	for (i = 0; i < scenario_cnt; i++) {
 		if (!scenarios[i].check_func) {
@@ -726,15 +728,16 @@ void is_dual_mode_update(struct is_device_ischain *device,
 	/* Update max fps of dual sensor device with reference to shot meta. */
 	dual_info->max_fps[sensor->position] = frame->shot->ctl.aa.aeTargetFpsRange[1];
 
+	resourcemgr = sensor->resourcemgr;
 	/* Check the number of active sensors for all PIP sensor combinations */
 	for (i = 0; i < SENSOR_POSITION_REAR_TOF; i++) {
-		if (dual_info->max_fps[i] >= 10)
+		if (resourcemgr->limited_fps && dual_info->max_fps[i])
+			streaming_cnt++;
+		else if (dual_info->max_fps[i] >= 10)
 			streaming_cnt++;
 	}
 
-	resourcemgr = sensor->resourcemgr;
 	resourcemgr->streaming_cnt = streaming_cnt;
-	streaming_cnt = 0;
 
 	/* Continue if wide and tele/s-wide complete is_sensor_s_input(). */
 	if (!(test_bit(SENSOR_POSITION_REAR, &core->sensor_map) &&
@@ -748,11 +751,6 @@ void is_dual_mode_update(struct is_device_ischain *device,
 	 * switch - master_max_fps : 5ps, slave_max_fps : 30fps (post standby)
 	 * nothing - invalid mode
 	 */
-	for (i = 0; i < SENSOR_POSITION_REAR_TOF; i++) {
-		if (dual_info->max_fps[i] >= 10)
-			streaming_cnt++;
-	}
-
 	if (streaming_cnt == 1)
 		dual_info->mode = IS_DUAL_MODE_BYPASS;
 	else if (streaming_cnt >= 2)

@@ -60,8 +60,6 @@ const char *cmd_type_name[MAX_CMD_TYPE] = {
 	[CMD_TYPE_COND_END] = "COND_END",
 };
 
-static int panel_dsi_wait_for_vsync(struct panel_device *panel, u32 timeout);
-
 void print_data(char *data, int size)
 {
 	char buf[256];
@@ -983,7 +981,7 @@ static int panel_cmdq_flush(struct panel_device *panel)
 			v4l2_subdev_call(&panel->profiler.sd, core, ioctl, PROFILE_DATALOG, &pc);
 		}
 		pp.pkt_type = PROFILER_DATALOG_PANEL | PROFILER_DATALOG_PANEL_CMD_FLUSH_END;
-		pp.time = ktime_get();
+		pp.time = ktime_after(time_end, pp.time) ? (time_end - pp.time) : (KTIME_MAX - pp.time) + time_end;
 		v4l2_subdev_call(&panel->profiler.sd, core, ioctl, PROFILE_DATALOG, &pp);
 	}
 #endif
@@ -1254,7 +1252,7 @@ static int panel_dsi_get_state(struct panel_device *panel)
 	return panel->mipi_drv.get_state(panel->dsi_id);
 }
 
-static int panel_dsi_wait_for_vsync(struct panel_device *panel, u32 timeout)
+int panel_dsi_wait_for_vsync(struct panel_device *panel, u32 timeout)
 {
 	if (unlikely(!panel || !panel->mipi_drv.wait_for_vsync))
 		return -EINVAL;

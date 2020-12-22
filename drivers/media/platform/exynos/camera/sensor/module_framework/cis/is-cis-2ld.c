@@ -1079,6 +1079,21 @@ int sensor_2ld_cis_mode_change(struct v4l2_subdev *subdev, u32 mode)
 		info("[%s] sensor mode done(%d)\n", __func__, mode);
 	}
 
+#ifdef CAMERA_2LD_SLOW_MOTION_PDAF_OFF
+	/* TEMP PD OFF when slow motion */
+	if (mode == SENSOR_2LD_2016X1134_240FPS) {
+		ret |= is_sensor_write16(cis->client, 0x6000, 0x0005);
+		ret |= is_sensor_write16(cis->client, 0xFCFC, 0x2000);
+		ret |= is_sensor_write8(cis->client, 0x1AA1, 0x00);
+		ret |= is_sensor_write16(cis->client, 0xFCFC, 0x4000);
+		ret |= is_sensor_write8(cis->client, 0x0115, 0x00);
+		ret |= is_sensor_write8(cis->client, 0x0B80, 0x00);
+		ret |= is_sensor_write16(cis->client, 0x6000, 0x0085);
+
+		info("[%s] 2LD slow motion pdaf off setting",__func__);
+	}
+#endif
+
 	pr_info("%s : disable AEB\n", __func__);
 	cis->cis_data->pre_aeb_mode = SENSOR_AEB_MODE_OFF;
 	cis->cis_data->cur_aeb_mode = SENSOR_AEB_MODE_OFF;

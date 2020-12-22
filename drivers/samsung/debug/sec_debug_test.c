@@ -29,6 +29,8 @@
 #include <linux/preempt.h>
 #include <linux/rwsem.h>
 #include <linux/moduleparam.h>
+#include <asm/stackprotector.h>
+#include <linux/sched/signal.h>
 
 #include <soc/samsung/exynos-pmu.h>
 #include <soc/samsung/exynos-debug.h>
@@ -104,6 +106,8 @@ static void simulate_PRINTK_FAULT(char **argv, int argc);
 static void simulate_EXIN_UNFZ(char **arg, int argc);
 static void simulate_WQLOCK_BUSY_WORKER(char **argv, int argc);
 static void simulate_WQLOCK_BUSY_TASK(char **argv, int argc);
+static void simulate_STACK_CORRUPTION(char **argv, int argc);
+static void simulate_SIG(char **argv, int argc);
 
 enum {
 	FORCE_KERNEL_PANIC = 0,		/* KP */
@@ -160,8 +164,10 @@ enum {
 	FORCE_RWSEM_W,			/* RWSEM WRITER */
 	FORCE_PRINTK_FAULT,		/* PRINTK FAULT */
 	FORCE_EXIN_UNFZ,		/* EXTRA INFO UN FREEZE TASK */
-	FORCE_WQLOCK_BUSY_WORKER,		/* WORKQUEUE LOCKUP BUSY WORKER */
-	FORCE_WQLOCK_BUSY_TASK,				/* WORKQUEUE LOCKUP BUSY TASK */
+	FORCE_WQLOCK_BUSY_WORKER,	/* WORKQUEUE LOCKUP BUSY WORKER */
+	FORCE_WQLOCK_BUSY_TASK,		/* WORKQUEUE LOCKUP BUSY TASK */
+	FORCE_STACK_CORRUPTION,		/* STACK CORRUPTION */
+	FORCE_SIG,			/* SEND SIG */
 	NR_FORCE_ERROR,
 };
 
@@ -232,6 +238,8 @@ struct force_error force_error_vector = {
 		{"exinunfz",	&simulate_EXIN_UNFZ},
 		{"wqlockup-busyworker",	&simulate_WQLOCK_BUSY_WORKER},
 		{"wqlockup-busytask",	&simulate_WQLOCK_BUSY_TASK},
+		{"stackcorrupt",	&simulate_STACK_CORRUPTION},
+		{"sig",	&simulate_SIG},
 	}
 };
 
@@ -1372,6 +1380,100 @@ wakeup:
 	}
 }
 
+/* base register for accessing canary in stack */
+#define SZ_STACK_FP	SZ_128
+#define SZ_STACK_SP	SZ_4
+
+static void secdbg_test_stack_corruption_type0(unsigned long cdata)
+{
+	volatile unsigned long data_array[SZ_STACK_FP];
+	volatile unsigned long *ptarget = (unsigned long *)data_array + SZ_STACK_FP;
+
+	pr_info("%s: cdata: %016lx\n", __func__, cdata);
+	pr_info("%s: __stack_chk_guard: %016lx\n", __func__, __stack_chk_guard);
+	pr_info("%s: original: [<0x%px>]: %016lx\n", __func__, ptarget, *ptarget);
+
+	*ptarget = cdata;
+
+	pr_info("%s: corrupted: [<0x%px>]: %016lx\n", __func__, ptarget, *ptarget);
+}
+
+static void secdbg_test_stack_corruption_type1(unsigned long cdata)
+{
+	volatile unsigned long data_array[SZ_STACK_SP];
+	volatile unsigned long *ptarget = (unsigned long *)data_array + SZ_STACK_SP;
+
+	pr_info("%s: cdata: %016lx\n", __func__, cdata);
+	pr_info("%s: __stack_chk_guard: %016lx\n", __func__, __stack_chk_guard);
+	pr_info("%s: original: [<0x%px>]: %016lx\n", __func__, ptarget, *ptarget);
+
+	*ptarget = cdata;
+
+	pr_info("%s: corrupted: [<0x%px>]: %016lx\n", __func__, ptarget, *ptarget);
+}
+
+/*
+ * 1st arg
+ *   0: use fp (default)
+ *   1: use sp
+ * 2nd arg is data pattern for corruption (default value can be used)
+ */
+static void simulate_STACK_CORRUPTION(char **argv, int argc)
+{
+	int ret;
+	unsigned int type = 0;
+	unsigned long cdata = 0xBEEFCAFE01234567;
+
+	if (argc > 0) {
+		ret = kstrtouint(argv[0], 0, &type);
+		if (ret)
+			pr_err("%s: Failed to get first argument\n", __func__);
+	}
+
+	if (argc > 1) {
+		ret = kstrtoul(argv[1], 0, &cdata);
+		if (ret)
+			pr_err("%s: Failed to get second argument\n", __func__);
+	}
+
+	if (type == 0) {
+		pr_info("%s: call x29 fn: %pS\n", __func__, secdbg_test_stack_corruption_type0);
+		secdbg_test_stack_corruption_type0(cdata);
+	} else {
+		pr_info("%s: call sp fn: %pS\n", __func__, secdbg_test_stack_corruption_type1);
+		secdbg_test_stack_corruption_type1(cdata);
+	}
+}
+
+#define DEBUGGER_SIGNAL 35 //__SIGRTMIN+3
+#define KERNEL_LOG_OPT 2
+static void simulate_SIG(char **argv, int argc)
+{
+	struct task_struct *p = NULL;
+	int pid, opt, ret;
+
+	if (argc) {
+		ret = kstrtoint(argv[0], 0, &pid);
+		if (ret || !pid)
+			return;
+
+		p = get_pid_task(find_vpid(pid), PIDTYPE_PID);
+
+		if (argc >= 2) {
+			ret = kstrtoint(argv[1], 0, &opt);
+			if (ret)
+				goto out;
+		}
+		else
+			opt = KERNEL_LOG_OPT;
+
+		secdbg_send_sig_debuggerd(p, opt);
+	}
+out:
+	if (p)
+		put_task_struct(p);
+}
+
 static int sec_debug_get_force_error(char *buffer, const struct kernel_param *kp)
 {
 	int i;
@@ -1391,6 +1493,11 @@ static int sec_debug_set_force_error(const char *val, const struct kernel_param 
 	char **argv;
 
 	argv = argv_split(GFP_KERNEL, val, &argc);
+
+	if (!argv) {
+		pr_info("Failed to split arguments.\n");
+		return -ENOMEM;
+	}
 
 	for (i = 0; i < NR_FORCE_ERROR; i++) {
 		if (!strcmp(argv[0], force_error_vector.item[i].errname)) {

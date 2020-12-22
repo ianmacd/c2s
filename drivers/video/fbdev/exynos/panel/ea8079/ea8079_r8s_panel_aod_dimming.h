@@ -22,7 +22,7 @@
  * PANEL : PRE
  */
 static unsigned int r8s_aod_brt_tbl[EA8079_R8S_AOD_NR_LUMINANCE] = {
-	BRT_LT(40), BRT_LT(71), BRT_LT(94), BRT(255),
+	BRT_LT(6), BRT_LT(20), BRT_LT(41), BRT(255),
 };
 
 static unsigned int r8s_aod_lum_tbl[EA8079_R8S_AOD_NR_LUMINANCE] = {

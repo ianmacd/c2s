@@ -1154,7 +1154,7 @@ int dsp_linker_init(struct dsp_dl_lib_file *file)
 			"Reloc rules");
 	ret = dsp_reloc_rule_list_import(rules, file);
 	if (ret == -1) {
-		DL_ERROR("Rule path is invalid\n");
+		DL_ERROR("Failed to import reloc rule list\n");
 		dsp_dl_free(rules);
 		return -1;
 	}

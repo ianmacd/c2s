@@ -81,6 +81,7 @@ void put_cred(const struct cred *_cred)
 			__put_cred(cred);
 	}
 }
+#ifdef CONFIG_FASTUH_RKP
 /*Check whether the address belong to Cred Area*/
 u8 rkp_ro_page(unsigned long addr)
 {
@@ -105,6 +106,7 @@ u8 rkp_ro_page(unsigned long addr)
 	}
 	return 0;
 }
+#endif
 #endif  /* CONFIG_KDP_CRED */
 
 /*
@@ -146,7 +148,7 @@ void rkp_get_init_cred(void)
 {
 	if (rkp_ro_page((unsigned long)&init_cred))
 		rocred_uc_inc((&init_cred));
-	else 
+	else
 		atomic_inc(&init_cred.usage);
 }
 EXPORT_SYMBOL(rkp_get_init_cred);
@@ -261,7 +263,7 @@ void __put_cred(struct cred *cred)
 #endif
 #ifdef CONFIG_KDP_CRED
 	if(cred == current->cred)
-		printk("[KDP] cred->security: %p\n", cred->security);		
+		printk(KERN_ERR "[KDP] cred->security: 0x%lx\n", cred->security);
 #endif
 	BUG_ON(cred == current->cred);
 	BUG_ON(cred == current->real_cred);
@@ -524,13 +526,14 @@ struct cred *prepare_exec_creds(void)
 
 	return new;
 }
+
 #ifdef CONFIG_KDP_CRED
 int rkp_from_tsec_jar(unsigned long addr)
 {
 	static void *objp;
 	static struct kmem_cache *s;
 	static struct page *page;
-	
+
 	objp = (void *)addr;
 
 	if(!objp)
@@ -538,28 +541,26 @@ int rkp_from_tsec_jar(unsigned long addr)
 
 	page = virt_to_head_page(objp);
 	s = page->slab_cache;
-	if(s && s->name) {
-		if(!strcmp(s->name,"tsec_jar")) {
-			return 1;
-		}
+	if(s && s->cred_type == KDP_TSEC_JAR) {
+		return 1;
 	}
 	return 0;
 }
-int chk_invalid_kern_ptr(u64 tsec) 
+
+int chk_invalid_kern_ptr(u64 tsec)
 {
 	return (((u64)tsec >> 36) != (u64)0xFFFFFFC);
 }
+
 void rkp_free_security(unsigned long tsec)
 {
-	if(!tsec || 
-		chk_invalid_kern_ptr(tsec))
+	if (!tsec || chk_invalid_kern_ptr(tsec))
 		return;
 
-	if(rkp_ro_page(tsec) && 
-		rkp_from_tsec_jar(tsec)) {
+	if (rkp_ro_page(tsec) && rkp_from_tsec_jar(tsec)) {
 		kmem_cache_free(tsec_jar,(void *)tsec);
 	}
-	else { 
+	else {
 		kfree((void *)tsec);
 	}
 }

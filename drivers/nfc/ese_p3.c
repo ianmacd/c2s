@@ -55,7 +55,11 @@
 /* Undef if want to keep eSE Power LDO ALWAYS ON */
 #define FEATURE_ESE_POWER_ON_OFF
 
+#ifdef CONFIG_ESE_COLDRESET
 #define SPI_DEFAULT_SPEED 12500000L
+#else
+#define SPI_DEFAULT_SPEED 6500000L
+#endif
 
 #ifdef CONFIG_ESE_SECURE
 static TEEC_UUID ese_drv_uuid = {
@@ -288,6 +292,7 @@ static int p3_regulator_onoff(struct p3_data *data, int onoff)
 				__func__, rc);
 			goto done;
 		}
+		msleep(30);
 	}
 
 	/*data->regulator_is_enable = (u8)onoff;*/
@@ -448,18 +453,18 @@ static int spip3_open(struct inode *inode, struct file *filp)
 	wake_lock(&p3_dev->ese_lock);
 #endif
 
-#ifdef CONFIG_ESE_SECURE
-	p3_clk_control(p3_dev, true);
-	tz_tee_ese_drv(PM_RESUME);
-#else
-	p3_pinctrl_config(p3_dev, true);
-#endif
-
 #ifdef FEATURE_ESE_POWER_ON_OFF
 	ret = p3_regulator_onoff(p3_dev, 1);
 	if (ret < 0)
 		P3_ERR_MSG(" %s : failed to turn on LDO()\n", __func__);
 	usleep_range(2000, 2500);
+#endif
+
+#ifdef CONFIG_ESE_SECURE
+	p3_clk_control(p3_dev, true);
+	tz_tee_ese_drv(PM_RESUME);
+#else
+	p3_pinctrl_config(p3_dev, true);
 #endif
 
 	filp->private_data = p3_dev;

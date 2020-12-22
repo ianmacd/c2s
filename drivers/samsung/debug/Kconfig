@@ -229,7 +229,7 @@ config SEC_DEBUG_FPSIMD_CHECK_CONTEXT
 
 config SEC_DEBUG_FAIL_TO_FREEZE_PANIC
 	bool "Panic on fail to freeze tasks"
-	depends on SEC_DEBUG
+	depends on SEC_DEBUG && !SAMSUNG_PRODUCT_SHIP
 	default y
 	help
 	  This option enables the kernel to panic on fail to freeze tasks
@@ -289,14 +289,6 @@ config SEC_DEBUG_TASK_IN_STATE_INFO
 	  This option enables the kernel to save a task information while the
 	  task enter in important system state.
 
-config SEC_PERF_LATENCYCHECKER
-	bool "Enable Samsung latenychecker"
-	depends on SEC_DEBUG
-	default n
-	help
-	  This option enables Samsung Latencychecker.
-	  Select the option if the kernel should check latency point.
-
 config SEC_DEBUG_SOFTDOG_PWDT
 	bool "Enable Soft Watchdog for Platform"
 	default y
@@ -328,3 +320,20 @@ config SEC_DEBUG_SOFTDOG
 	help
 	  This option enables enhanced softdog info.
 	  Select the option to show related task info.
+
+config SEC_DEBUG_QSPIN_OWNER
+	bool "Enable owner cpu number on spinlock"
+	depends on SEC_DEBUG && QUEUED_SPINLOCKS
+	default y
+	help
+	  This option enables spinlock owner information.
+	  The CPU number of owner is written into lock value.
+
+config SEC_DEBUG_SHOW_USER_STACK
+	bool "show user stack"
+	depends on SEC_DEBUG
+	default n
+	help
+	  This option enables user stack info in kernel log
+	  for debugging workqueuelockup or softlockup.
+	  Select the option to show user stack info in kernel log.

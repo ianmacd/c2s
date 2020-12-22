@@ -687,7 +687,13 @@ p_retry:
 
 	clear_bit(group->leader.id, &ldr_frame->out_flag);
 	trans_frame(ldr_framemgr, ldr_frame, FS_COMPLETE);
-	mgrinfo("[ERR] CANCEL(%d)\n", group, group, ldr_frame, ldr_frame->index);
+
+	mgrinfo("[ERR] CANCEL(i%d)(R%d, P%d, C%d)\n", group, group, ldr_frame,
+		ldr_frame->index,
+		ldr_framemgr->queued_count[FS_REQUEST],
+		ldr_framemgr->queued_count[FS_PROCESS],
+		ldr_framemgr->queued_count[FS_COMPLETE]);
+
 	CALL_VOPS(ldr_vctx, done, ldr_frame->index, VB2_BUF_STATE_ERROR);
 
 	is_group_unlock(group, flags, IS_DEVICE_MAX, true);

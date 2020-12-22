@@ -15,7 +15,7 @@
 #include "sec_debug_internal.h"
 
 static unsigned long dhist_base;
-static unsigned int dhist_size;
+static unsigned long dhist_size;
 
 static ssize_t secdbg_hist_hist_read(struct file *file, char __user *buf,
 				  size_t len, loff_t *offset)
@@ -25,7 +25,7 @@ static ssize_t secdbg_hist_hist_read(struct file *file, char __user *buf,
 	char *base = NULL;
 
 	if (!dhist_size) {
-		pr_crit("%s: size 0? %x\n", __func__, dhist_size);
+		pr_crit("%s: size 0? %lx\n", __func__, dhist_size);
 
 		ret = -ENXIO;
 
@@ -41,7 +41,7 @@ static ssize_t secdbg_hist_hist_read(struct file *file, char __user *buf,
 	}
 
 	if (pos >= dhist_size) {
-		pr_crit("%s: pos %llx , dhist: %x\n", __func__, pos, dhist_size);
+		pr_crit("%s: pos %llx , dhist: %lx\n", __func__, pos, dhist_size);
 
 		ret = 0;
 
@@ -88,7 +88,10 @@ static int __init secdbg_hist_late_init(void)
 	base = (char *)phys_to_virt((phys_addr_t)dhist_base);
 	dhist_size = secdbg_base_get_buf_size(SDN_MAP_DEBUG_PARAM);
 
-	pr_info("%s: base: %p(%lx) size: %x\n", __func__, base, dhist_base, dhist_size);
+	pr_info("%s: base: %p(%lx) size: %lx\n", __func__, base, dhist_base, dhist_size);
+
+	if (!dhist_base || !dhist_size)
+		return 0;
 
 	p = base;
 	pr_info("%s: dummy: %x\n", __func__, *p);

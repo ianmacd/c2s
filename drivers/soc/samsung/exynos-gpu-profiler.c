@@ -6,7 +6,8 @@
 #include <soc/samsung/cal-if.h>
 #include <soc/samsung/exynos-profiler.h>
 #include <soc/samsung/exynos-migov.h>
-#include "../../gpu/arm/v_r20p0/platform/exynos/gpu_dvfs_api.h"
+
+#include "exynos-gpu-api.h"
 
 enum hwevent {
 	Q0_EMPTY,

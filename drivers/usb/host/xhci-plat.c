@@ -761,6 +761,9 @@ static int xhci_plat_remove(struct platform_device *dev)
 }
 
 extern u32 otg_is_connect(void);
+extern int xhci_halt(struct xhci_hcd *xhci);
+extern void xhci_hc_died(struct xhci_hcd *xhci);
+
 static int __maybe_unused xhci_plat_suspend(struct device *dev)
 {
 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
@@ -768,6 +771,11 @@ static int __maybe_unused xhci_plat_suspend(struct device *dev)
 	int ret;
 
 	pr_info("[%s] \n",__func__);
+
+	if (xhci->xhc_state & XHCI_STATE_DYING) {
+		pr_info("xhci is already died...\n");
+		return 0;
+	}
 
 	/*
 	 * xhci_suspend() needs `do_wakeup` to know whether host is allowed
@@ -779,8 +787,14 @@ static int __maybe_unused xhci_plat_suspend(struct device *dev)
 	 */
 
 	ret = xhci_suspend(xhci, device_may_wakeup(dev));
-	if (ret)
+	if (ret) {
+		if (ret == -ETIMEDOUT) {
+			pr_info("xhci stop timeout.(Try to xhci halt)\n");
+			xhci_halt(xhci);
+			xhci_hc_died(xhci);
+		}
 		return ret;
+	}
 
 
 	if (otg_is_connect() != 1) { /* If it is not OTG_CONNECT_ONLY */
@@ -801,6 +815,11 @@ static int __maybe_unused xhci_plat_resume(struct device *dev)
 	int ret;
 
 	pr_info("[%s] \n",__func__);
+
+	if (xhci->xhc_state & XHCI_STATE_DYING) {
+		pr_info("xhci is already died...\n");
+		return 0;
+	}
 
 	ret = xhci_priv_resume_quirk(hcd);
 	if (ret)

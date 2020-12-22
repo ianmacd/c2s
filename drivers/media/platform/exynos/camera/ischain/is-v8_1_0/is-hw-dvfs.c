@@ -1191,19 +1191,24 @@ DECLARE_DVFS_CHK_FUNC(IS_SN_REAR_CAMCORDING_UHD)
 /* rear camcording UHD@60fps */
 DECLARE_DVFS_CHK_FUNC(IS_SN_REAR_CAMCORDING_UHD_60FPS)
 {
+	u32 scen = (device->setfile & IS_SCENARIO_MASK) >> IS_SCENARIO_SHIFT;
 	u32 mask = (device->setfile & IS_SETFILE_MASK);
 	bool setfile_flag = ((mask == ISS_SUB_SCENARIO_UHD_60FPS_WDR_ON) ||
 			(mask == ISS_SUB_SCENARIO_UHD_60FPS ) ||
 			(mask == ISS_SUB_SCENARIO_UHD_60FPS_WDR_AUTO));
+	bool scenario_flag = (scen == IS_SCENARIO_PRO_VIDEO);
 
 	if (IS_REAR_SENSOR(position) &&
 			(fps > 30) &&
 			(fps <= 60) &&
-			(resol >= SIZE_UHD) &&
-			setfile_flag)
-		return 1;
-	else
-		return 0;
+			setfile_flag) {
+		if (scenario_flag)
+			return 1;
+		else
+			if(resol >= SIZE_UHD)
+				return 1;
+	}
+	return 0;
 }
 
 /* rear camcording 8K UHD*/

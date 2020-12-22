@@ -733,6 +733,7 @@ int panel_bl_set_brightness(struct panel_bl_device *panel_bl, int id, int force)
 	struct panel_device *panel;
 	int luminance_interp = 0;
 	u32 dim_type;
+	bool need_update_display_mode = false;
 
 	if (panel_bl == NULL) {
 		panel_err("panel is null\n");
@@ -795,6 +796,21 @@ int panel_bl_set_brightness(struct panel_bl_device *panel_bl, int id, int force)
 	if (unlikely(!force || !luminance))
 		goto set_br_exit;
 
+#ifdef CONFIG_PANEL_VRR_BRIDGE
+	if (panel_vrr_bridge_is_supported(panel) &&
+			!panel_vrr_bridge_is_reached_target_nolock(panel)) {
+		panel->panel_data.props.panel_mode =
+			panel->panel_data.props.target_panel_mode;
+		need_update_display_mode = true;
+	}
+#endif
+#if defined(CONFIG_PANEL_DISPLAY_MODE)
+	if (panel_vrr_is_supported(panel) &&
+			panel->panel_data.props.vrr_updated == true) {
+		panel->panel_data.props.vrr_updated = false;
+		need_update_display_mode = true;
+	}
+#endif
 
 	//g_tracing_mark_write('C', "lcd_br", luminance);
 #ifdef CONFIG_SUPPORT_HMD
@@ -805,19 +821,18 @@ int panel_bl_set_brightness(struct panel_bl_device *panel_bl, int id, int force)
 	if (id == PANEL_BL_SUBDEV_TYPE_AOD)
 		index = PANEL_ALPM_ENTER_SEQ;
 #endif
+
 	if (index == PANEL_SET_BL_SEQ &&
-			panel_vrr_is_supported(panel) &&
-			panel->panel_data.props.vrr_updated == true) {
-		panel->panel_data.props.vrr_updated = false;
+			need_update_display_mode) {
 #if defined(CONFIG_PANEL_DISPLAY_MODE)
-		ret = panel_do_seqtbl_by_index_nolock(panel,
-				PANEL_DISPLAY_MODE_SEQ);
-		panel_display_mode_cb(panel);
-#endif
+		ret = panel_set_display_mode_nolock(panel,
+				panel->panel_data.props.panel_mode);
 		if (unlikely(ret < 0)) {
 			panel_err("failed to write seqtbl\n");
 			goto set_br_exit;
 		}
+		panel_display_mode_cb(panel);
+#endif
 	} else {
 		ret = panel_do_seqtbl_by_index_nolock(panel, index);
 		if (unlikely(ret < 0)) {
@@ -888,6 +903,10 @@ int panel_update_brightness(struct panel_device *panel)
 		panel_err("failed to set_brightness (ret %d)\n", ret);
 		goto exit_set;
 	}
+
+#ifdef CONFIG_SUPPORT_MASK_LAYER
+	panel_bl->props.last_br_update_time = ktime_get();
+#endif
 
 exit_set:
 	mutex_unlock(&panel->op_lock);

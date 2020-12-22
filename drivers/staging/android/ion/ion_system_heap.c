@@ -124,6 +124,12 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 		return -ENOMEM;
 	}
 
+	if (!!(flags & ION_FLAG_PROTECTED)) {
+		perrfn("ION_FLAG_PROTECTED is set to non-secure heap %s",
+		       heap->name);
+		return -EINVAL;
+	}
+
 	INIT_LIST_HEAD(&pages);
 	while (size_remaining > 0) {
 		page = alloc_largest_available(sys_heap, buffer, size_remaining,
@@ -416,6 +422,12 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 	struct sg_table *table;
 	unsigned long i;
 	int ret;
+
+	if (!!(flags & ION_FLAG_PROTECTED)) {
+		perrfn("ION_FLAG_PROTECTED is set to non-secure heap %s",
+		       heap->name);
+		return -EINVAL;
+	}
 
 	page = alloc_pages(low_order_gfp_flags | __GFP_NOWARN, order);
 	if (!page)

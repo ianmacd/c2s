@@ -190,7 +190,7 @@ module_param(debug, int, 0644);
 
 static void __vb2_queue_cancel(struct vb2_queue *q);
 static void __enqueue_in_driver(struct vb2_buffer *vb);
-static void __qbuf_work(struct work_struct *work);
+static void __qbuf_work(struct kthread_work *work);
 
 /*
  * __vb2_buf_mem_alloc() - allocate video memory for the given buffer
@@ -361,7 +361,7 @@ static int __vb2_queue_alloc(struct vb2_queue *q, enum vb2_memory memory,
 		vb->index = q->num_buffers + buffer;
 		vb->type = q->type;
 		vb->memory = memory;
-		INIT_WORK(&vb->qbuf_work, __qbuf_work);
+		kthread_init_work(&vb->qbuf_work, __qbuf_work);
 		spin_lock_init(&vb->fence_cb_lock);
 		for (plane = 0; plane < num_planes; ++plane) {
 			vb->planes[plane].length = plane_sizes[plane];
@@ -532,6 +532,10 @@ static int __vb2_queue_free(struct vb2_queue *q, unsigned int buffers)
 	/* Free videobuf buffers */
 	for (buffer = q->num_buffers - buffers; buffer < q->num_buffers;
 	     ++buffer) {
+		if (q->bufs[buffer]->qbuf_workq) {
+			kthread_destroy_worker(q->bufs[buffer]->qbuf_workq);
+			q->bufs[buffer]->qbuf_workq = NULL;
+		}
 		kfree(q->bufs[buffer]);
 		q->bufs[buffer] = NULL;
 	}
@@ -1454,7 +1458,7 @@ static int vb2_start_streaming(struct vb2_queue *q)
 	return ret;
 }
 
-static void __qbuf_work(struct work_struct *work)
+static void __qbuf_work(struct kthread_work *work)
 {
 	struct vb2_buffer *vb;
 	struct vb2_queue *q;
@@ -1496,8 +1500,13 @@ static void __qbuf_work(struct work_struct *work)
 static void vb2_qbuf_fence_cb(struct dma_fence *f, struct dma_fence_cb *cb)
 {
 	struct vb2_buffer *vb = container_of(cb, struct vb2_buffer, fence_cb);
+	int ret;
 
-	schedule_work(&vb->qbuf_work);
+	del_timer(&vb->fence_timer);
+
+	ret = kthread_queue_work(vb->qbuf_workq, &vb->qbuf_work);
+	if (!ret)
+		pr_err("%s : the work is already queued\n", __func__);
 }
 
 #define VB2_FENCE_TIMEOUT		(1000)
@@ -1507,6 +1516,7 @@ static void vb2_fence_timeout_handler(struct timer_list *t)
 	struct dma_fence *fence;
 	unsigned long flags;
 	char name[32];
+	int ret;
 
 	pr_err("%s: fence callback is not called during %d ms\n",
 					__func__, VB2_FENCE_TIMEOUT);
@@ -1540,7 +1550,9 @@ static void vb2_fence_timeout_handler(struct timer_list *t)
 
 	spin_unlock_irqrestore(&vb->fence_cb_lock, flags);
 
-	schedule_work(&vb->qbuf_work);
+	ret = kthread_queue_work(vb->qbuf_workq, &vb->qbuf_work);
+	if (!ret)
+		pr_err("%s : the work is already queued\n", __func__);
 }
 
 int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb,
@@ -1585,6 +1597,15 @@ int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb,
 	q->queueing_started = 1;
 	vb->state = VB2_BUF_STATE_QUEUED;
 	vb->in_fence = in_fence;
+
+	if (vb->in_fence && !vb->qbuf_workq) {
+		vb->qbuf_workq = kthread_create_worker(0, "vb2_kthread_worker");
+		if (IS_ERR(vb->qbuf_workq)) {
+			ret = PTR_ERR(vb->qbuf_workq);
+			pr_err("fail to create kthread_worker(err:%d)\n", ret);
+			goto err;
+		}
+	}
 
 	if (pb)
 		call_void_bufop(q, copy_timestamp, vb, pb);
@@ -1960,8 +1981,7 @@ static void __vb2_queue_cancel(struct vb2_queue *q)
 		}
 		spin_unlock_irqrestore(&vb->fence_cb_lock, flags);
 
-		if (work_busy(&vb->qbuf_work))
-			cancel_work_sync(&vb->qbuf_work);
+		kthread_cancel_work_sync(&vb->qbuf_work);
 	}
 
 	/*

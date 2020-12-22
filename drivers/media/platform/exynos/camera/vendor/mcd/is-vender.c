@@ -1257,11 +1257,15 @@ void is_vendor_prepare_retention(struct is_core *core, int sensor_id, int positi
 		goto p_err;
 	}
 
+#ifdef CAMERA_USE_COMMON_VDDIO
+	msleep(20);
+#endif
+
 	/* Sensor power on */
 	ret = module->pdata->gpio_cfg(module, scenario, GPIO_SCENARIO_ON);
 	if (ret) {
 		warn("gpio on is fail(%d)", ret);
-		goto p_power_off;
+		goto p_err;
 	}
 
 	sensor_peri = (struct is_device_sensor_peri *)module->private_data;
@@ -1273,36 +1277,41 @@ void is_vendor_prepare_retention(struct is_core *core, int sensor_id, int positi
 					__func__, __LINE__, core->current_position);
 		} else {
 			warn("%s: wrong cis i2c_channel(%d)", __func__, i2c_channel);
-			goto p_power_off;
+			goto p_err;
 		}
 
 		cis = (struct is_cis *)v4l2_get_subdevdata(sensor_peri->subdev_cis);
 		ret = CALL_CISOPS(cis, cis_check_rev_on_init, sensor_peri->subdev_cis);
 		if (ret) {
 			warn("v4l2_subdev_call(cis_check_rev_on_init) is fail(%d)", ret);
-			goto p_power_off;
+			goto p_err;
 		}
 
 		ret = CALL_CISOPS(cis, cis_init, sensor_peri->subdev_cis);
 		if (ret) {
 			warn("v4l2_subdev_call(init) is fail(%d)", ret);
-			goto p_power_off;
+			goto p_err;
 		}
 
 		ret = CALL_CISOPS(cis, cis_set_global_setting, sensor_peri->subdev_cis);
 		if (ret) {
 			warn("v4l2_subdev_call(cis_set_global_setting) is fail(%d)", ret);
-			goto p_power_off;
+			goto p_err;
 		}
 	}
 
-p_power_off:
 	ret = module->pdata->gpio_cfg(module, scenario, GPIO_SCENARIO_SENSOR_RETENTION_ON);
 	if (ret)
-		warn("gpio off is fail(%d)", ret);
+		warn("gpio off (retention) is fail(%d)", ret);
 
+	info("%s: end %d (retention)\n", __func__, ret);
+	return;
 p_err:
-	info("%s: end %d\n", __func__, ret);
+	ret = module->pdata->gpio_cfg(module, scenario, GPIO_SCENARIO_OFF);
+	if (ret)
+		err("gpio off is fail(%d)", ret);
+
+	warn("%s: end %d\n", __func__, ret);
 }
 #endif
 
@@ -2014,7 +2023,7 @@ void is_vendor_sensor_suspend(void)
 	info("%s", __func__);
 
 #ifdef CONFIG_OIS_USE
-	ois_factory_resource_clean();
+	//ois_factory_resource_clean();
 #endif
 
 	return;
@@ -2025,7 +2034,7 @@ void is_vendor_resource_clean(void)
 	info("%s", __func__);
 
 #ifdef CONFIG_OIS_USE
-	ois_factory_resource_clean();
+	//ois_factory_resource_clean();
 #endif
 
 	return;
@@ -2087,6 +2096,9 @@ extern int sky81296_torch_ctrl(int state);
 #if defined(CONFIG_TORCH_CURRENT_CHANGE_SUPPORT) && defined(CONFIG_LEDS_S2MPB02)
 extern int s2mpb02_set_torch_current(bool torch_mode, bool change_current, int intensity);
 #endif
+#if defined(CONFIG_TORCH_CURRENT_CHANGE_SUPPORT) && defined(CONFIG_LEDS_RT8547)
+extern int rt8547_set_movie_mode(bool on);
+#endif
 
 int is_vender_set_torch(struct camera2_shot *shot)
 {
@@ -2108,6 +2120,9 @@ int is_vender_set_torch(struct camera2_shot *shot)
 		else
 #endif
 			s2mpb02_set_torch_current(true, false, 0);
+#endif
+#if defined(CONFIG_TORCH_CURRENT_CHANGE_SUPPORT) && defined(CONFIG_LEDS_RT8547)
+		rt8547_set_movie_mode(true);
 #endif
 		break;
 	case AA_FLASHMODE_START: /*Pre flash mode*/
@@ -2495,7 +2510,7 @@ int is_vendor_shaking_gpio_on(struct is_vender *vender)
 	is_af_move_lens_rear2(core);
 #endif
 
-p_err:	
+p_err:
 	check_shaking_noise = true;
 	mutex_unlock(&g_shaking_mutex);
 	info("%s X\n", __func__);

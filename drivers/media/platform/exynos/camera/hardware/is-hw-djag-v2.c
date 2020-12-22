@@ -327,7 +327,7 @@ int is_hw_mcsc_update_djag_register(struct is_hw_ip *hw_ip,
 		 */
 		temp = (temp_stripe_pre_dst_x * hratio) + h_phase_offset;
 		offset = (u32)(temp >> MCSC_PRECISION) - temp_stripe_start_pos_x;
-		max_dst_width = ((ulong)(in_width - offset) * RATIO_X8_8) / hratio;
+		max_dst_width = (u32)(((ulong)(in_width - offset) * RATIO_X8_8) / hratio);
 		if (param->input.stripe_region_index == param->input.stripe_total_count - 1) {
 			if (out_width > max_dst_width) {
 				msdbg_hw(2, "djag: stripe output width(%d) is over input,\

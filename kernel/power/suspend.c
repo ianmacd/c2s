@@ -38,7 +38,9 @@
 #include <linux/regulator/machine.h>
 #endif /* CONFIG_SEC_PM_DEBUG */
 #include <linux/sec_debug.h>
-
+#ifdef CONFIG_SEC_PERF_BIG_AFFINITY_RESUME
+#include <linux/cpumask.h>
+#endif
 #include "power.h"
 
 const char * const pm_labels[] = {
@@ -68,6 +70,20 @@ static DECLARE_SWAIT_QUEUE_HEAD(s2idle_wait_head);
 
 enum s2idle_states __read_mostly s2idle_state;
 static DEFINE_RAW_SPINLOCK(s2idle_lock);
+
+#ifdef CONFIG_SEC_PERF_BIG_AFFINITY_RESUME
+static struct cpumask fast_cpu_mask;
+static struct cpumask backup_cpu_mask;
+
+static void init_pm_cpumask(void)
+{
+	int i;
+	cpumask_clear(&fast_cpu_mask);
+	for (i = 6; i < nr_cpu_ids; i++) {
+		cpumask_set_cpu(i, &fast_cpu_mask);
+	}
+}
+#endif
 
 bool pm_suspend_via_s2idle(void)
 {
@@ -202,6 +218,10 @@ void __init pm_states_init(void)
 	 * initialize mem_sleep_states[] accordingly here.
 	 */
 	mem_sleep_states[PM_SUSPEND_TO_IDLE] = mem_sleep_labels[PM_SUSPEND_TO_IDLE];
+
+#ifdef CONFIG_SEC_PERF_BIG_AFFINITY_RESUME
+	init_pm_cpumask();
+#endif
 }
 
 static int __init mem_sleep_default_setup(char *str)
@@ -531,6 +551,11 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
  Enable_cpus:
 	enable_nonboot_cpus();
 
+#ifdef CONFIG_SEC_PERF_BIG_AFFINITY_RESUME
+	cpumask_copy(&backup_cpu_mask, &current->cpus_allowed);
+	set_cpus_allowed_ptr(current, &fast_cpu_mask);
+#endif
+
  Platform_wake:
 	mem_stop_offline();
 	platform_resume_noirq(state);
@@ -598,6 +623,14 @@ int suspend_devices_and_enter(suspend_state_t state)
  Close:
 	platform_resume_end(state);
 	pm_suspend_target_state = PM_SUSPEND_ON;
+
+#ifdef CONFIG_SEC_PERF_BIG_AFFINITY_RESUME
+	if (!cpumask_empty(&backup_cpu_mask)) {
+		cpumask_copy(&current->cpus_allowed, &backup_cpu_mask);
+		cpumask_clear(&backup_cpu_mask);
+	}
+#endif
+
 	return error;
 
  Recover_platform:

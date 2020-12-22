@@ -1835,6 +1835,8 @@ static DEFINE_STATIC_PACKET(hubble2_a3_s0_display_on, DSI_PKT_TYPE_WR, HUBBLE2_A
 static DEFINE_STATIC_PACKET(hubble2_a3_s0_display_off, DSI_PKT_TYPE_WR, HUBBLE2_A3_S0_DISPLAY_OFF, 0);
 static DEFINE_STATIC_PACKET(hubble2_a3_s0_exit_alpm, DSI_PKT_TYPE_WR, HUBBLE2_A3_S0_EXIT_ALPM, 0);
 
+static DEFINE_COND(hubble2_a3_s0_cond_is_panel_state_not_lpm, is_panel_state_not_lpm);
+
 #if defined(__PANEL_NOT_USED_VARIABLE__)
 static DEFINE_STATIC_PACKET(hubble2_a3_s0_te_off, DSI_PKT_TYPE_WR, HUBBLE2_A3_S0_TE_OFF, 0);
 #endif
@@ -2378,6 +2380,14 @@ static u8 HUBBLE2_A3_S0_MAFPC_ENABLE[] = {
 static DEFINE_PKTUI(hubble2_a3_s0_mafpc_enable, &hubble2_a3_s0_maptbl[MAFPC_ENA_MAPTBL], 1);
 static DEFINE_VARIABLE_PACKET(hubble2_a3_s0_mafpc_enable, DSI_PKT_TYPE_WR, HUBBLE2_A3_S0_MAFPC_ENABLE, 0);
 
+static u8 HUBBLE2_A3_S0_MAFPC_SCALE[] = {
+	0x87,
+	0xFF, 0xFF, 0xFF,
+};
+static DEFINE_PKTUI(hubble2_a3_s0_mafpc_scale, &hubble2_a3_s0_maptbl[MAFPC_SCALE_MAPTBL], 1);
+static DEFINE_VARIABLE_PACKET(hubble2_a3_s0_mafpc_scale, DSI_PKT_TYPE_WR, HUBBLE2_A3_S0_MAFPC_SCALE, 0x08);
+
+
 static u8 HUBBLE2_A3_S0_MAFPC_DISABLE[] = {
 	0x87, 0x00,
 };
@@ -2457,6 +2467,7 @@ static void *hubble2_a3_s0_mafpc_image_cmdtbl[] = {
 static void *hubble2_a3_s0_mafpc_on_cmdtbl[] = {
 	&KEYINFO(hubble2_a3_s0_level2_key_enable),
 	&PKTINFO(hubble2_a3_s0_mafpc_enable),
+	&PKTINFO(hubble2_a3_s0_mafpc_scale),
 	&KEYINFO(hubble2_a3_s0_level2_key_disable),
 };
 
@@ -2490,13 +2501,6 @@ static void *hubble2_a3_s0_mafpc_check_cmdtbl[] = {
 	&KEYINFO(hubble2_a3_s0_level2_key_disable),
 	&KEYINFO(hubble2_a3_s0_level1_key_disable),
 };
-
-static u8 HUBBLE2_A3_S0_MAFPC_SCALE[] = {
-	0x87,
-	0xFF, 0xFF, 0xFF,
-};
-static DEFINE_PKTUI(hubble2_a3_s0_mafpc_scale, &hubble2_a3_s0_maptbl[MAFPC_SCALE_MAPTBL], 1);
-static DEFINE_VARIABLE_PACKET(hubble2_a3_s0_mafpc_scale, DSI_PKT_TYPE_WR, HUBBLE2_A3_S0_MAFPC_SCALE, 0x08);
 
 
 static DEFINE_PANEL_TIMER_MDELAY(hubble2_a3_s0_mafpc_delay, 130);
@@ -2970,8 +2974,10 @@ static void *hubble2_a3_s0_preliminary_set_fps_cmdtbl[] = {
 static void *hubble2_a3_s0_preliminary_display_mode_cmdtbl[] = {
 	&KEYINFO(hubble2_a3_s0_level1_key_enable),
 	&KEYINFO(hubble2_a3_s0_level2_key_enable),
+	&CONDINFO_S(hubble2_a3_s0_cond_is_panel_state_not_lpm),
 	&SEQINFO(hubble2_a3_s0_set_bl_param_seq),
 	&DLYINFO(hubble2_a3_s0_wait_1_vsync),
+	&CONDINFO_E(hubble2_a3_s0_cond_is_panel_state_not_lpm),
 #ifdef CONFIG_SUPPORT_DSU
 	&PKTINFO(hubble2_a3_s0_dsc),
 	&PKTINFO(hubble2_a3_s0_pps),
@@ -2979,8 +2985,10 @@ static void *hubble2_a3_s0_preliminary_display_mode_cmdtbl[] = {
 	&PKTINFO(hubble2_a3_s0_paset),
 	&PKTINFO(hubble2_a3_s0_scaler),
 #endif
+	&CONDINFO_S(hubble2_a3_s0_cond_is_panel_state_not_lpm),
 	&SEQINFO(hubble2_a3_s0_preliminary_set_fps_param_seq),
 	&PKTINFO(hubble2_a3_s0_gamma_update_enable),
+	&CONDINFO_E(hubble2_a3_s0_cond_is_panel_state_not_lpm),
 	&KEYINFO(hubble2_a3_s0_level2_key_disable),
 	&KEYINFO(hubble2_a3_s0_level1_key_disable),
 };
@@ -3015,8 +3023,10 @@ static void *hubble2_a3_s0_osc_86_4m_set_fps_cmdtbl[] = {
 static void *hubble2_a3_s0_osc_86_4m_display_mode_cmdtbl[] = {
 	&KEYINFO(hubble2_a3_s0_level1_key_enable),
 	&KEYINFO(hubble2_a3_s0_level2_key_enable),
+	&CONDINFO_S(hubble2_a3_s0_cond_is_panel_state_not_lpm),
 	&SEQINFO(hubble2_a3_s0_set_bl_param_seq),
 	&DLYINFO(hubble2_a3_s0_wait_1_vsync),
+	&CONDINFO_E(hubble2_a3_s0_cond_is_panel_state_not_lpm),
 #ifdef CONFIG_SUPPORT_DSU
 	&PKTINFO(hubble2_a3_s0_dsc),
 	&PKTINFO(hubble2_a3_s0_pps),
@@ -3024,8 +3034,10 @@ static void *hubble2_a3_s0_osc_86_4m_display_mode_cmdtbl[] = {
 	&PKTINFO(hubble2_a3_s0_paset),
 	&PKTINFO(hubble2_a3_s0_scaler),
 #endif
+	&CONDINFO_S(hubble2_a3_s0_cond_is_panel_state_not_lpm),
 	&SEQINFO(hubble2_a3_s0_osc_86_4m_set_fps_param_seq),
 	&PKTINFO(hubble2_a3_s0_gamma_update_enable),
+	&CONDINFO_E(hubble2_a3_s0_cond_is_panel_state_not_lpm),
 	&KEYINFO(hubble2_a3_s0_level2_key_disable),
 	&KEYINFO(hubble2_a3_s0_level1_key_disable),
 };
@@ -3060,8 +3072,10 @@ static void *hubble2_a3_s0_osc_96_5m_set_fps_cmdtbl[] = {
 static void *hubble2_a3_s0_osc_96_5m_display_mode_cmdtbl[] = {
 	&KEYINFO(hubble2_a3_s0_level1_key_enable),
 	&KEYINFO(hubble2_a3_s0_level2_key_enable),
+	&CONDINFO_S(hubble2_a3_s0_cond_is_panel_state_not_lpm),
 	&SEQINFO(hubble2_a3_s0_set_bl_param_seq),
 	&DLYINFO(hubble2_a3_s0_wait_1_vsync),
+	&CONDINFO_E(hubble2_a3_s0_cond_is_panel_state_not_lpm),
 #ifdef CONFIG_SUPPORT_DSU
 	&PKTINFO(hubble2_a3_s0_dsc),
 	&PKTINFO(hubble2_a3_s0_pps),
@@ -3069,8 +3083,10 @@ static void *hubble2_a3_s0_osc_96_5m_display_mode_cmdtbl[] = {
 	&PKTINFO(hubble2_a3_s0_paset),
 	&PKTINFO(hubble2_a3_s0_scaler),
 #endif
+	&CONDINFO_S(hubble2_a3_s0_cond_is_panel_state_not_lpm),
 	&SEQINFO(hubble2_a3_s0_osc_96_5m_set_fps_param_seq),
 	&PKTINFO(hubble2_a3_s0_gamma_update_enable),
+	&CONDINFO_E(hubble2_a3_s0_cond_is_panel_state_not_lpm),
 	&KEYINFO(hubble2_a3_s0_level2_key_disable),
 	&KEYINFO(hubble2_a3_s0_level1_key_disable),
 };
@@ -3116,6 +3132,7 @@ static void *hubble2_a3_s0_display_on_cmdtbl[] = {
 #ifdef CONFIG_SUPPORT_MAFPC
 	&KEYINFO(hubble2_a3_s0_level2_key_enable),
 	&PKTINFO(hubble2_a3_s0_mafpc_enable),
+	&PKTINFO(hubble2_a3_s0_mafpc_scale),
 	&KEYINFO(hubble2_a3_s0_level2_key_disable),
 #endif
 	&KEYINFO(hubble2_a3_s0_level1_key_enable),

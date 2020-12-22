@@ -1429,7 +1429,9 @@ static int panel_poc_open(struct inode *inode, struct file *file)
 	if (ret < 0)
 		goto err_open;
 
+	mutex_lock(&panel->op_lock);
 	poc_info->state = 0;
+	mutex_unlock(&panel->op_lock);
 	memset(poc_info->poc_chksum, 0, sizeof(poc_info->poc_chksum));
 	memset(poc_info->poc_ctrl, 0, sizeof(poc_info->poc_ctrl));
 
@@ -1468,7 +1470,9 @@ static int panel_poc_release(struct inode *inode, struct file *file)
 
 	mutex_lock(&panel->io_lock);
 
+	mutex_lock(&panel->op_lock);
 	poc_info->state = 0;
+	mutex_unlock(&panel->op_lock);
 	memset(poc_info->poc_chksum, 0, sizeof(poc_info->poc_chksum));
 	memset(poc_info->poc_ctrl, 0, sizeof(poc_info->poc_ctrl));
 

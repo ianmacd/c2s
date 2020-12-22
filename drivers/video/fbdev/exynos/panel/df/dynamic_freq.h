@@ -106,6 +106,7 @@ enum {
 int dynamic_freq_probe(struct panel_device *panel, struct df_freq_tbl_info *freq_set);
 int check_df_update(struct panel_device *panel);
 int set_dynamic_freq_ffc(struct panel_device *panel);
+int set_dynamic_freq_ffc_off(struct panel_device *panel);
 int finish_dynamic_freq(struct panel_device *panel);
 int dynamic_freq_update(struct panel_device *panel, int idx);
 

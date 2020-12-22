@@ -15,6 +15,7 @@ ccflags-y := -Wformat
 obj-$(CONFIG_SEC_DEBUG)		+= debug/
 obj-$(CONFIG_SEC_MISC)		+= misc/
 obj-$(CONFIG_SEC_PM)		+= pm/
+obj-$(CONFIG_SEC_PERF)		+= perf/
 
 # Samsung Reset Feature
 obj-$(CONFIG_SEC_REBOOT)	+= sec_reboot.o
@@ -30,7 +31,6 @@ obj-$(CONFIG_SEC_DEBUG)		+= sec_hard_reset_hook.o
 
 # Samsung Throughput monitoring Feature
 obj-$(CONFIG_ARGOS)		+= sec_argos.o
-obj-$(CONFIG_SEC_BOOTSTAT)	+= sec_bootstat.o
 
 # Samsung System Update
 obj-$(CONFIG_SEC_SYSUP)		+= sec_sysup.o

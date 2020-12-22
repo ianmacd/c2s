@@ -40,7 +40,7 @@
 					stat0 = </* not avaliable */>;									/* VC_BUF_DATA_TYPE_SENSOR_STAT1 */
 					stat1 = </*VC_STAT_TYPE_PDP_1_1_PDAF_STAT0*/ 800 /*VC_SENSOR_MODE_IMX_2X1OCL_2_TAIL*/ 504 992 1488 1>;	/* VC_BUF_DATA_TYPE_GENERAL_STAT1 */
 					stat2 = </* not avaliable */>;									/* VC_BUF_DATA_TYPE_SENSOR_STAT2 */
-					stat3 = </*VC_STAT_TYPE_PDP_1_1_PDAF_STAT1*/ 801 /*VC_SENSOR_MODE_IMX_2X1OCL_2_TAIL*/ 504 929 1488 1>;	/* VC_BUF_DATA_TYPE_GENERAL_STAT2 */
+					stat3 = </*VC_STAT_TYPE_PDP_1_1_PDAF_STAT1*/ 801 /*VC_SENSOR_MODE_IMX_2X1OCL_2_TAIL*/ 504 992 1488 1>;	/* VC_BUF_DATA_TYPE_GENERAL_STAT2 */
 				};
 
 				/* sensor modes */

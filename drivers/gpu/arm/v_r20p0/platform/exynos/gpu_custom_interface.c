@@ -62,6 +62,8 @@ int gpu_pmqos_dvfs_min_lock(int level)
 static ssize_t show_clock(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	ssize_t ret = 0;
+
+#ifdef CONFIG_MALI_DVFS
 	int clock = 0;
 	struct exynos_context *platform = (struct exynos_context *)pkbdev->platform_context;
 
@@ -95,6 +97,7 @@ static ssize_t show_clock(struct device *dev, struct device_attribute *attr, cha
 		buf[PAGE_SIZE-1] = '\0';
 		ret = PAGE_SIZE-1;
 	}
+#endif /* CONFIG_MALI_DVFS */
 
 	return ret;
 }
@@ -361,6 +364,9 @@ static int gpu_get_cl_pmqos_table(struct exynos_context *platform, char *buf, si
 	if (!platform)
 		return -ENODEV;
 
+	if (gpu_dvfs_get_level(platform->gpu_max_clock) < 0)
+		return -ENODEV;
+
 	if (buf == NULL)
 		return 0;
 
@@ -416,6 +422,7 @@ static ssize_t show_asv_table(struct device *dev, struct device_attribute *attr,
 	return ret;
 }
 
+#ifdef CONFIG_MALI_DVFS
 static int gpu_get_dvfs_table(struct exynos_context *platform, char *buf, size_t buf_size)
 {
 	int i, cnt = 0;
@@ -433,10 +440,13 @@ static int gpu_get_dvfs_table(struct exynos_context *platform, char *buf, size_t
 
 	return cnt;
 }
+#endif
 
 static ssize_t show_dvfs_table(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	ssize_t ret = 0;
+
+#ifdef CONFIG_MALI_DVFS
 	struct exynos_context *platform = (struct exynos_context *)pkbdev->platform_context;
 
 	if (!platform)
@@ -451,6 +461,7 @@ static ssize_t show_dvfs_table(struct device *dev, struct device_attribute *attr
 		buf[PAGE_SIZE-1] = '\0';
 		ret = PAGE_SIZE-1;
 	}
+#endif
 
 	return ret;
 }
@@ -458,6 +469,8 @@ static ssize_t show_dvfs_table(struct device *dev, struct device_attribute *attr
 static ssize_t show_time_in_state(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	ssize_t ret = 0;
+
+#ifdef CONFIG_MALI_DVFS
 	int i;
 	struct exynos_context *platform = (struct exynos_context *)pkbdev->platform_context;
 
@@ -467,10 +480,16 @@ static ssize_t show_time_in_state(struct device *dev, struct device_attribute *a
 	gpu_dvfs_update_time_in_state(gpu_control_is_power_on(pkbdev) * platform->cur_clock);
 
 	for (i = gpu_dvfs_get_level(platform->gpu_min_clock); i >= gpu_dvfs_get_level(platform->gpu_max_clock); i--) {
+#ifdef CONFIG_MALI_TSG
 		ret += snprintf(buf+ret, PAGE_SIZE-ret, "%d %llu %llu\n",
 				platform->table[i].clock,
 				platform->table[i].time,
 				platform->table[i].time_busy / 100);
+#else
+		ret += snprintf(buf+ret, PAGE_SIZE-ret, "%d %llu\n",
+				platform->table[i].clock,
+				platform->table[i].time);
+#endif
 	}
 
 	if (ret >= PAGE_SIZE - 1) {
@@ -478,6 +497,7 @@ static ssize_t show_time_in_state(struct device *dev, struct device_attribute *a
 		buf[PAGE_SIZE-1] = '\0';
 		ret = PAGE_SIZE-1;
 	}
+#endif
 
 	return ret;
 }
@@ -1208,6 +1228,7 @@ static ssize_t set_tmu_control(struct device *dev, struct device_attribute *attr
 	return count;
 }
 
+#ifdef CONFIG_MALI_TSG
 static ssize_t show_feedback_governor_impl(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	ssize_t ret = 0;
@@ -1307,6 +1328,7 @@ static ssize_t set_queued_threshold_1(struct device *dev, struct device_attribut
 
 	return count;
 }
+#endif
 
 #ifdef CONFIG_CPU_THERMAL_IPA
 static ssize_t show_norm_utilization(struct device *dev, struct device_attribute *attr, char *buf)
@@ -1733,9 +1755,11 @@ DEVICE_ATTR(highspeed_delay, S_IRUGO|S_IWUSR, show_highspeed_delay, set_highspee
 DEVICE_ATTR(wakeup_lock, S_IRUGO|S_IWUSR, show_wakeup_lock, set_wakeup_lock);
 DEVICE_ATTR(polling_speed, S_IRUGO|S_IWUSR, show_polling_speed, set_polling_speed);
 DEVICE_ATTR(tmu, S_IRUGO|S_IWUSR, show_tmu, set_tmu_control);
+#ifdef CONFIG_MALI_TSG
 DEVICE_ATTR(feedback_governor_impl, S_IRUGO, show_feedback_governor_impl, NULL);
 DEVICE_ATTR(queued_threshold_0, S_IWUSR, NULL, set_queued_threshold_0);
 DEVICE_ATTR(queued_threshold_1, S_IWUSR, NULL, set_queued_threshold_1);
+#endif
 #ifdef CONFIG_CPU_THERMAL_IPA
 DEVICE_ATTR(norm_utilization, S_IRUGO, show_norm_utilization, NULL);
 DEVICE_ATTR(utilization_stats, S_IRUGO, show_utilization_stats, NULL);
@@ -1977,9 +2001,9 @@ static ssize_t show_kernel_sysfs_utilization(struct kobject *kobj, struct kobj_a
 		return -ENODEV;
 
 	if (platform->power_status == true && platform->inter_frame_pm_status == true && platform->inter_frame_pm_is_poweron == false) /* IFPO off case */
-		ret += snprintf(buf+ret, PAGE_SIZE-ret, "%d", 0);
+		ret += snprintf(buf+ret, PAGE_SIZE-ret, "%3d%%", 0);
 	else
-		ret += snprintf(buf+ret, PAGE_SIZE-ret, "%d", gpu_control_is_power_on(pkbdev) * platform->env_data.utilization);
+		ret += snprintf(buf+ret, PAGE_SIZE-ret, "%3d%%", gpu_control_is_power_on(pkbdev) * platform->env_data.utilization);
 
 	if (ret < PAGE_SIZE - 1) {
 		ret += snprintf(buf+ret, PAGE_SIZE-ret, "\n");
@@ -2448,6 +2472,7 @@ int gpu_create_sysfs_file(struct device *dev)
 		GPU_LOG(DVFS_ERROR, DUMMY, 0u, 0u, "couldn't create sysfs file [gpu_logical_power_mode]\n");
 		goto out;
 	}
+#ifdef CONFIG_MALI_TSG
 	if (device_create_file(dev, &dev_attr_feedback_governor_impl)) {
 		GPU_LOG(DVFS_ERROR, DUMMY, 0u, 0u, "couldn't create sysfs file [feedback_gov]\n");
 		goto out;
@@ -2461,7 +2486,7 @@ int gpu_create_sysfs_file(struct device *dev)
 		GPU_LOG(DVFS_ERROR, DUMMY, 0u, 0u, "couldn't create sysfs file [queued_threshold_1]\n");
 		goto out;
 	}
-
+#endif
 #ifdef CONFIG_MALI_DYNAMIC_IFPO
 	if (device_create_file(dev, &dev_attr_ifpo_count)) {
 		GPU_LOG(DVFS_ERROR, DUMMY, 0u, 0u, "couldn't create sysfs file [ifpo_count]\n");
@@ -2547,9 +2572,11 @@ void gpu_remove_sysfs_file(struct device *dev)
 #endif
 	device_remove_file(dev, &dev_attr_gpu_oper_mode);
 	device_remove_file(dev, &dev_attr_gpu_logical_power_mode);
+#ifdef CONFIG_MALI_TSG
 	device_remove_file(dev, &dev_attr_feedback_governor_impl);
 	device_remove_file(dev, &dev_attr_queued_threshold_0);
 	device_remove_file(dev, &dev_attr_queued_threshold_1);
+#endif
 #ifdef CONFIG_MALI_DYNAMIC_IFPO
 	device_remove_file(dev, &dev_attr_ifpo_count);
 	device_remove_file(dev, &dev_attr_dynamic_ifpo_util);

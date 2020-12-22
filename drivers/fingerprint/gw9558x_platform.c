@@ -13,13 +13,13 @@
 int gw9558_register_platform_variable(struct gf_device *gf_dev)
 {
 #ifdef ENABLE_SENSORS_FPRINT_SECURE
-	gf_dev->fp_spi_pclk = clk_get(NULL, "fp_spi_pclk");
+	gf_dev->fp_spi_pclk = clk_get(NULL, "fp-spi-pclk");
 	if (IS_ERR(gf_dev->fp_spi_pclk)) {
 		pr_err("Can't get fp_spi_pclk\n");
 		return PTR_ERR(gf_dev->fp_spi_pclk);
 	}
 
-	gf_dev->fp_spi_sclk = clk_get(NULL, "fp_spi_sclk");
+	gf_dev->fp_spi_sclk = clk_get(NULL, "fp-spi-sclk");
 	if (IS_ERR(gf_dev->fp_spi_sclk)) {
 		pr_err("Can't get fp_spi_sclk\n");
 		return PTR_ERR(gf_dev->fp_spi_sclk);

@@ -408,4 +408,6 @@ extern void secdbg_base_set_kallsyms_info(struct sec_debug_ksyms *ksyms, int mag
 /* sec_debug_memtab.c */
 extern void secdbg_base_set_memtab_info(struct sec_debug_memtab *ksyms);
 
+/* sec_debug_reset_reason.c */
+extern int secdbg_rere_get_rstcnt_from_cmdline(void);
 #endif /* __SEC_DEBUG_INTERNAL_H__ */

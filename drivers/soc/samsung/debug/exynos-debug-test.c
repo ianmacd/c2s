@@ -31,6 +31,7 @@
 #include <asm/cacheflush.h>
 #include <soc/samsung/exynos-pmu.h>
 #include <soc/samsung/exynos-debug.h>
+#include <soc/samsung/acpm_ipc_ctrl.h>
 
 #define EXYNOS_DEBUG_TEST_END	(0xCAFEDB9)
 #define ALL_FORCE_ERRORS	31
@@ -67,6 +68,7 @@ static void simulate_WRITE_RO(char *arg);
 static void simulate_OVERFLOW(char *arg);
 static void simulate_CACHE_FLUSH(char *arg);
 static void simulate_test_start(char *arg);
+static void simulate_APM_WDT(char *arg);
 
 static int exynos_debug_test_desc_init(struct device_node *np);
 
@@ -101,6 +103,7 @@ enum {
 	FORCE_BAD_SCHEDULING,		/* BAD SCHED */
 	FORCE_CACHE_FLUSH,		/* CACHE FLUSH */
 	FORCE_TEST_START,		/* START TEST */
+	FPRCE_APM_WDT,
 	NR_FORCE_ERROR,
 };
 
@@ -181,6 +184,7 @@ static struct force_error force_error_vector = {
 		{"badsched",	&simulate_BAD_SCHED},
 		{"cacheflush",	&simulate_CACHE_FLUSH},
 		{"all",		&simulate_test_start},
+		{"apmwdt",	&simulate_APM_WDT},
 	}
 };
 
@@ -896,6 +900,12 @@ static void simulate_CACHE_FLUSH(char *arg)
 	memset(buffer[cpu], 0x5A, PAGE_SIZE * 2);
 	dbg_snapshot_set_debug_test_buffer_addr(addr, cpu);
 	s3c2410wdt_set_emergency_reset(10, 0);
+}
+
+static void simulate_APM_WDT(char *arg)
+{
+	exynos_acpm_force_apm_wdt_reset();
+	asm volatile("b .");
 }
 
 static ssize_t exynos_debug_test_write(struct file *file,

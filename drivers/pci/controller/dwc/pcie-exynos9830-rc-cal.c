@@ -37,9 +37,33 @@ void exynos_pcie_rc_phy_check_rx_elecidle(void *phy_pcs_base_regs, int val, int 
 void exynos_pcie_rc_phy_all_pwrdn(struct exynos_pcie *exynos_pcie, int ch_num)
 {
 	void *phy_base_regs = exynos_pcie->phy_base;
+	void __iomem *sysreg_base_regs = exynos_pcie->sysreg_base;
+	u32 val;
 
-	pr_info("%s: phybase + 0x400 : 0x23\n", __func__);
+	if (exynos_pcie->sudden_linkdown || exynos_pcie->cpl_timeout_recovery) {
+		/* pr_info("%s: skip disable during sudden linkdown\n", __func__); */
+		return;
+	}
+
+	if (ch_num == 0) {
+		val = readl(sysreg_base_regs);
+		val &= ~(0x1 << 5);
+		val |= (0x1 << 4);
+		writel(val, sysreg_base_regs);
+		pr_info("%s: Input 100MHz(sysreg base + 0x1060 = 0x%x)\n",
+				__func__, readl(sysreg_base_regs));
+	} else {
+		val = readl(sysreg_base_regs + 0x800);
+		val &= ~(0x1 << 5);
+		val |= (0x1 << 4);
+		writel(val, sysreg_base_regs + 0x800);
+		pr_info("%s: Input 100MHz(sysreg base + 0x800 = 0x%x)\n",
+				__func__, readl(sysreg_base_regs + 0x800));
+	}
+
 	writel(0x23, phy_base_regs + 0x400);
+	pr_info("%s: phy base + 0x400 = 0x%x\n", __func__,
+			readl(phy_base_regs + 0x400));
 }
 
 /* PHY all power down clear */
@@ -49,6 +73,28 @@ void exynos_pcie_rc_phy_all_pwrdn_clear(struct exynos_pcie *exynos_pcie, int ch_
 
 	pr_info("%s: phybase + 0x400 : 0x0\n", __func__);
         writel(0x0, phy_base_regs + 0x400);
+}
+
+/* PHY input clk change */
+void exynos_pcie_rc_phy_input_clk_change(struct exynos_pcie *exynos_pcie, bool enable)
+{
+	void __iomem *phy_base_regs = exynos_pcie->phy_base;
+
+	if (enable) {
+		/* pr_info("%s: set input clk path to enable\n", __func__); */
+		writel(0x28, phy_base_regs + 0xD8);
+	} else {
+		if (exynos_pcie->sudden_linkdown || exynos_pcie->cpl_timeout_recovery) {
+			pr_debug("%s: skip disable during sudden linkdown\n", __func__);
+		} else {
+			if (exynos_pcie->state == STATE_LINK_DOWN) {
+				/* pr_info("%s: set input clk path to disable\n", __func__); */
+				writel(0x6D, phy_base_regs + 0xD8);
+			}
+		}
+	}
+	/* pr_info("%s: input clk path change (phy base + 0xD8 = 0x%x\n",
+			__func__, readl(phy_base_regs + 0xD8)); */
 }
 
 void exynos_pcie_rc_pcie_phy_otp_config(void *phy_base_regs, int ch_num)
@@ -87,6 +133,11 @@ void exynos_pcie_rc_pcie_phy_config(struct exynos_pcie *exynos_pcie, int ch_num)
 	udelay(10);
 	writel(0x0, elbi_base_regs + 0x1408);
 	mdelay(1);
+
+	/* input clk patch change init */
+	writel(0x28, phy_base_regs + 0xD8);
+	pr_info("%s: input clk path change init(phy base + 0xD8 = 0x%x\n",
+			__func__, readl(phy_base_regs + 0xD8));
 
 	if (chip_ver == 0) {
 		/* for EVT0 */
@@ -301,9 +352,6 @@ void exynos_pcie_rc_pcie_phy_config(struct exynos_pcie *exynos_pcie, int ch_num)
 
 		writel(0x08, phy_base_regs + 0x82C);
 		writel(0x08, phy_base_regs + 0x82C + 0x800);
-
-
-
 	}
 
 	/* AES disable */
@@ -468,11 +516,17 @@ void exynos_pcie_rc_phy_init(struct pcie_port *pp)
 	exynos_pcie->phy_ops.phy_all_pwrdn_clear = exynos_pcie_rc_phy_all_pwrdn_clear;
 	exynos_pcie->phy_ops.phy_config = exynos_pcie_rc_pcie_phy_config;
 	exynos_pcie->phy_ops.phy_eom = exynos_pcie_rc_eom;
+	exynos_pcie->phy_ops.phy_input_clk_change = exynos_pcie_rc_phy_input_clk_change;
 }
 
 static void exynos_pcie_quirks(struct pci_dev *dev)
 {
+#if defined(CONFIG_EXYNOS_PCI_PM_ASYNC)
+	device_enable_async_suspend(&dev->dev);
+	pr_info("[%s:pcie_1] enable async_suspend\n", __func__);
+#else
 	device_disable_async_suspend(&dev->dev);
 	pr_info("[%s] async suspend disabled\n", __func__);
+#endif
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, exynos_pcie_quirks);

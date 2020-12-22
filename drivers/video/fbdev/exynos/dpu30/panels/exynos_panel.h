@@ -105,13 +105,23 @@ static inline char *EXYNOS_VRR_MODE_STR(int vrr_mode)
 
 #define MAX_DISPLAY_MODE		32
 /* exposed to user */
-struct exynos_display_mode {
+struct exynos_display_mode_old {
 	u32 index;
 	u32 width;
 	u32 height;
 	u32 mm_width;
 	u32 mm_height;
 	u32 fps;
+};
+
+struct exynos_display_mode {
+	unsigned int index;
+	unsigned int width;
+	unsigned int height;
+	unsigned int mm_width;
+	unsigned int mm_height;
+	unsigned int fps;
+	unsigned int group;
 };
 
 /* used internally by driver */

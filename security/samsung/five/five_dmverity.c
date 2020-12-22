@@ -141,7 +141,7 @@ static enum five_dmverity_codes is_dmverity_partition(
 	 */
 	for (i = 0; i < ARRAY_SIZE(dm_targets_name); ++i) {
 		if (!strncmp(target->type->name, dm_targets_name[i],
-				strlen(dm_targets_name[i]))) {
+				strlen(dm_targets_name[i]) + 1)) {
 			result = FIVE_DMV_PARTITION;
 			break;
 		}

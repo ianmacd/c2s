@@ -185,7 +185,7 @@ static void pca9468_test_read(struct pca9468_charger *pca9468)
 	char str[1024] = { 0, };
 
 	sprintf(str, "[DC_CPEN:%s]", (pca9468->pdata->chgen_gpio >= 0) ?
-		gpio_level[gpio_get_value(pca9468->pdata->chgen_gpio)] : "NONE");
+		gpio_level[!!gpio_get_value(pca9468->pdata->chgen_gpio)] : "NONE");
 
 	for (address = PCA9468_REG_INT1_STS; address <= PCA9468_REG_STS_ADC_9; address++) {
 		pca9468_read_reg(pca9468, address, &val);

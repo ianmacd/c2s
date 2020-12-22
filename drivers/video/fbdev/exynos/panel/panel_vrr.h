@@ -83,6 +83,13 @@ struct vrr_lfd_config {
 	u32 max;
 };
 
+struct vrr_lfd_status {
+	int lfd_min_freq;
+	int lfd_max_freq;
+	int lfd_min_freq_div;
+	int lfd_max_freq_div;
+};
+
 struct vrr_lfd_info {
 	/* requested lfd config */
 	struct vrr_lfd_config req[MAX_VRR_LFD_CLIENT][MAX_VRR_LFD_SCOPE];
@@ -91,10 +98,7 @@ struct vrr_lfd_info {
 	struct vrr_lfd_config cur[MAX_VRR_LFD_SCOPE];
 
 	/* lfd status */
-	int lfd_min_freq;
-	int lfd_max_freq;
-	int lfd_min_freq_div;
-	int lfd_max_freq_div;
+	struct vrr_lfd_status status[MAX_VRR_LFD_SCOPE];
 };
 
 bool panel_vrr_is_supported(struct panel_device *panel);
@@ -107,6 +111,9 @@ struct panel_vrr *get_panel_vrr(struct panel_device *panel);
 int get_panel_refresh_rate(struct panel_device *panel);
 int get_panel_refresh_mode(struct panel_device *panel);
 #ifdef CONFIG_PANEL_VRR_BRIDGE
+bool panel_vrr_bridge_is_reached_target_nolock(struct panel_device *panel);
+bool panel_vrr_bridge_is_supported(struct panel_device *panel);
+bool panel_vrr_bridge_changeable(struct panel_device *panel);
 int panel_vrr_bridge_thread(void *data);
 #else
 static inline int panel_vrr_bridge_thread(void *data) { return 0; }

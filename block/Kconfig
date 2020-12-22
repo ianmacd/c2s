@@ -248,3 +248,13 @@ config BLK_MQ_RDMA
 	default y
 
 source block/Kconfig.iosched
+
+config BLK_WRITE_BOOSTER_TEST
+	bool "KUnit test for UFS Write Booster test in UML"
+	default n
+	depends on KUNIT && UML
+	select BLK_IO_VOLUME
+	select BLK_TURBO_WRITE
+	help
+	  kunit test for UFS Write Booster funtionality check in UML.
+

@@ -208,10 +208,6 @@ static int star_dev_open(struct inode *inode, struct file *filp)
 
 	INFO("star_open\n");
 
-	if (star == NULL) {
-		return -EINVAL;
-	}
-
 	mutex_lock(&(star->lock));
 
 	filp->private_data = star;

@@ -417,9 +417,11 @@ static ssize_t camera_camfw_show(char *buf, enum is_cam_info_index cam_index, bo
 		is_sec_get_loaded_fw(&loaded_fw);
 	} else {
 		switch(position) {
+#ifndef USE_CAMFW_POLICY_ED38
 			case SENSOR_POSITION_REAR:
 				loaded_fw = pinfo->header_ver;
 				break;
+#endif
 			case SENSOR_POSITION_REAR_TOF:
 			case SENSOR_POSITION_FRONT_TOF:
 				loaded_fw = "N";
@@ -430,9 +432,11 @@ static ssize_t camera_camfw_show(char *buf, enum is_cam_info_index cam_index, bo
 		}
 	}
 
+#ifndef USE_CAMFW_POLICY_ED38
 	if (position == SENSOR_POSITION_REAR)
 		phone_fw = pinfo->header_ver;
 	else
+#endif
 		phone_fw = "N";
 
 	other_vendor = test_bit(IS_ROM_STATE_OTHER_VENDOR, &finfo->rom_state);
@@ -2452,7 +2456,7 @@ static ssize_t camera_rear_tof_check_pd_store(struct device *dev,
 	if (ret_count != 1) {
 		return -EINVAL;
 	}
-	
+
 	camera_tof_set_laser_current(SENSOR_POSITION_REAR_TOF, value);
 
 	return count;
@@ -3212,7 +3216,7 @@ static bool read_ois_version(void)
 	struct is_vender_specific *specific = sysfs_core->vender.private_data;
 
 	pr_info("%s\n", __func__);
- 
+
 	if (!specific->ois_ver_read || force_caldata_dump) {
 #ifndef CONFIG_CAMERA_USE_INTERNAL_MCU
 		ois_power_control(1);
@@ -3229,7 +3233,7 @@ static bool read_ois_version(void)
 static ssize_t camera_ois_power_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 
-{	
+{
 	pr_info("%s: %c\n", __func__, buf[0]);
 
 	switch (buf[0]) {
@@ -3374,8 +3378,9 @@ static ssize_t camera_ois_rear3_gain_show(struct device *dev,
 	xgain = (ois_pinfo->tele_xgg[3] << 24) | (ois_pinfo->tele_xgg[2] << 16) | (ois_pinfo->tele_xgg[1] << 8) | (ois_pinfo->tele_xgg[0]);
 	ygain = (ois_pinfo->tele_ygg[3] << 24) | (ois_pinfo->tele_ygg[2] << 16) | (ois_pinfo->tele_ygg[1] << 8) | (ois_pinfo->tele_ygg[0]);
 
-	if ((ois_pinfo->tele_xgg[0] == 'F' || ois_pinfo->tele_xgg[0] == 'f') &&
-		(ois_pinfo->tele_ygg[0] == 'F' || ois_pinfo->tele_ygg[0] == 'f')) {
+	info("%s xgain/ygain = 0x%08x/0x%08x", __func__, xgain, ygain);
+
+	if ((ois_pinfo->tele_xgg[0] == 0xFF) && (ois_pinfo->tele_ygg[0] == 0xFF)) {
 		return sprintf(buf, "%d\n", 2);
 	} else if (ois_pinfo->tele_cal_mark[0] != 0xBB) {
 		return sprintf(buf, "%d\n", 1);
@@ -3396,8 +3401,9 @@ static ssize_t camera_ois_rear3_supperssion_ratio_show(struct device *dev,
 	xratio = (ois_pinfo->tele_supperssion_xratio[1] << 8) | (ois_pinfo->tele_supperssion_xratio[0]);
 	yratio = (ois_pinfo->tele_supperssion_yratio[1] << 8) | (ois_pinfo->tele_supperssion_yratio[0]);
 
-	if ((ois_pinfo->tele_supperssion_xratio[0] == 'F' || ois_pinfo->tele_supperssion_xratio[0] == 'f') &&
-		(ois_pinfo->tele_supperssion_yratio[0] == 'F' || ois_pinfo->tele_supperssion_yratio[0] == 'f')) {
+	info("%s xratio/yratio = %d.%d/%d.%d", __func__, xratio / 100, xratio % 100, yratio / 100, yratio % 100);
+
+	if ((ois_pinfo->tele_supperssion_xratio[0] == 0xFF) && (ois_pinfo->tele_supperssion_yratio[0] == 0xFF)) {
 		return sprintf(buf, "%d\n", 2);
 	} else if (ois_pinfo->tele_cal_mark[0] != 0xBB) {
 		return sprintf(buf, "%d\n", 1);
@@ -3620,8 +3626,9 @@ static ssize_t camera_ois_rear_gain_show(struct device *dev,
 	xgain = (ois_pinfo->wide_xgg[3] << 24) | (ois_pinfo->wide_xgg[2] << 16) | (ois_pinfo->wide_xgg[1] << 8) | (ois_pinfo->wide_xgg[0]);
 	ygain = (ois_pinfo->wide_ygg[3] << 24) | (ois_pinfo->wide_ygg[2] << 16) | (ois_pinfo->wide_ygg[1] << 8) | (ois_pinfo->wide_ygg[0]);
 
-	if ((ois_pinfo->wide_xgg[0] == 'F' || ois_pinfo->wide_xgg[0] == 'f') &&
-		(ois_pinfo->wide_ygg[0] == 'F' || ois_pinfo->wide_ygg[0] == 'f')) {
+	info("%s xgain/ygain = 0x%08x/0x%08x", __func__, xgain, ygain);
+
+	if ((ois_pinfo->wide_xgg[0] == 0xFF) && (ois_pinfo->wide_ygg[0] == 0xFF)) {
 		return sprintf(buf, "%d\n", 2);
 	} else if (ois_pinfo->wide_cal_mark[0]!= 0xBB) {
 		return sprintf(buf, "%d\n", 1);
@@ -3642,8 +3649,9 @@ static ssize_t camera_ois_rear_supperssion_ratio_show(struct device *dev,
 	xratio = (ois_pinfo->wide_supperssion_xratio[1] << 8) | (ois_pinfo->wide_supperssion_xratio[0]);
 	yratio = (ois_pinfo->wide_supperssion_yratio[1] << 8) | (ois_pinfo->wide_supperssion_yratio[0]);
 
-	if ((ois_pinfo->wide_supperssion_xratio[0] == 'F' || ois_pinfo->wide_supperssion_xratio[0] == 'f') &&
-		(ois_pinfo->wide_supperssion_yratio[0] == 'F' || ois_pinfo->wide_supperssion_yratio[0] == 'f')) {
+	info("%s xratio/yratio = %d.%d/%d.%d", __func__, xratio / 100, xratio % 100, yratio / 100, yratio % 100);
+
+	if ((ois_pinfo->wide_supperssion_xratio[0] == 0xFF) && (ois_pinfo->wide_supperssion_yratio[0] == 0xFF)) {
 		return sprintf(buf, "%d\n", 2);
 	} else if (ois_pinfo->wide_cal_mark[0] != 0xBB) {
 		return sprintf(buf, "%d\n", 1);
@@ -3691,7 +3699,7 @@ static ssize_t camera_ois_shaking_noise_store(struct device *dev,
 
 #if defined(CONFIG_SEC_FACTORY)
 	return 0;
-#endif	
+#endif
 	pr_info("%s: %c\n", __func__, buf[0]);
 
 	is_vender_check_hw_init_running();
@@ -3946,24 +3954,14 @@ static ssize_t camera_rear_moduleid_show(struct device *dev,
 }
 
 #if defined(CONFIG_CAMERA_EEPROM_SUPPORT_FRONT)
+#ifndef CAMERA_FRONT_FIXED_FOCUS
 static ssize_t camera_front_afcal_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	return camera_afcal_show(buf, CAM_INFO_FRONT);
 }
 
-static ssize_t camera_front_moduleid_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	return camera_moduleid_show(buf, CAM_INFO_FRONT);
-}
-
-static ssize_t camera_front_mtf_exif_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	return camera_mtf_exif_show(buf, CAM_INFO_FRONT, FNUMBER_1ST);
-}
-
+#ifdef ROM_PAF_CAL_DATA_START_ADDR_FRONT
 static ssize_t camera_front_paf_cal_check_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -3978,6 +3976,19 @@ static ssize_t camera_front_paf_cal_check_show(struct device *dev,
 	paf_err_data_result = *data | ( *(data + 1) << 8) | ( *(data + 2) << 16) | (*(data + 3) << 24);
 
 	return sprintf(buf, "%08X\n", paf_err_data_result);
+}
+#endif
+#endif
+static ssize_t camera_front_moduleid_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return camera_moduleid_show(buf, CAM_INFO_FRONT);
+}
+
+static ssize_t camera_front_mtf_exif_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return camera_mtf_exif_show(buf, CAM_INFO_FRONT, FNUMBER_1ST);
 }
 
 static ssize_t camera_front_sensorid_exif_show(struct device *dev,
@@ -4666,9 +4677,13 @@ static DEVICE_ATTR(front_mipi_clock, 0440, camera_front_mipi_clock_show, NULL);
 #if defined(CONFIG_CAMERA_EEPROM_SUPPORT_FRONT)
 static DEVICE_ATTR(front_camfw_full, S_IRUGO, camera_front_camfw_full_show, NULL);
 static DEVICE_ATTR(front_checkfw_factory, S_IRUGO, camera_front_checkfw_factory_show, NULL);
+#ifndef CAMERA_FRONT_FIXED_FOCUS
 static DEVICE_ATTR(front_afcal, S_IRUGO, camera_front_afcal_show, NULL);
-static DEVICE_ATTR(front_mtf_exif, S_IRUGO, camera_front_mtf_exif_show, NULL);
+#ifdef ROM_PAF_CAL_DATA_START_ADDR_FRONT
 static DEVICE_ATTR(front_paf_cal_check, S_IRUGO, camera_front_paf_cal_check_show, NULL);
+#endif
+#endif
+static DEVICE_ATTR(front_mtf_exif, S_IRUGO, camera_front_mtf_exif_show, NULL);
 static DEVICE_ATTR(front_sensorid_exif, S_IRUGO, camera_front_sensorid_exif_show, NULL);
 static DEVICE_ATTR(front_awb_master, S_IRUGO, camera_front_awb_master_show, NULL);
 static DEVICE_ATTR(front_awb_module, S_IRUGO, camera_front_awb_module_show, NULL);
@@ -4907,14 +4922,18 @@ int is_create_sysfs(struct is_core *core)
 			pr_err("failed to create front device file, %s\n",
 					dev_attr_front_mtf_exif.attr.name);
 		}
+#ifndef CAMERA_FRONT_FIXED_FOCUS
+#ifdef ROM_PAF_CAL_DATA_START_ADDR_FRONT
 		if (device_create_file(camera_front_dev, &dev_attr_front_paf_cal_check) < 0) {
 			pr_err("failed to create front device file, %s\n",
 					dev_attr_front_paf_cal_check.attr.name);
 		}
+#endif
 		if (device_create_file(camera_front_dev, &dev_attr_front_afcal) < 0) {
 			pr_err("failed to create front device file, %s\n",
 					dev_attr_front_afcal.attr.name);
 		}
+#endif
 		if (device_create_file(camera_front_dev, &dev_attr_front_awb_master) < 0) {
 			pr_err("failed to create front device file, %s\n",
 					dev_attr_front_awb_master.attr.name);
@@ -5665,12 +5684,16 @@ int is_destroy_sysfs(struct is_core *core)
 		device_remove_file(camera_front_dev, &dev_attr_front_caminfo);
 		device_remove_file(camera_front_dev, &dev_attr_front_camfw);
 #if defined(CONFIG_CAMERA_EEPROM_SUPPORT_FRONT)
+#ifndef CAMERA_FRONT_FIXED_FOCUS
 		device_remove_file(camera_front_dev, &dev_attr_front_afcal);
+#ifdef ROM_PAF_CAL_DATA_START_ADDR_FRONT
+		device_remove_file(camera_front_dev, &dev_attr_front_paf_cal_check);
+#endif
+#endif
 		device_remove_file(camera_front_dev, &dev_attr_front_camfw_full);
 		device_remove_file(camera_front_dev, &dev_attr_front_checkfw_factory);
 		device_remove_file(camera_front_dev, &dev_attr_front_moduleid);
 		device_remove_file(camera_front_dev, &dev_attr_front_mtf_exif);
-		device_remove_file(camera_front_dev, &dev_attr_front_paf_cal_check);
 		device_remove_file(camera_front_dev, &dev_attr_front_sensorid_exif);
 		device_remove_file(camera_front_dev, &dev_attr_front_awb_master);
 		device_remove_file(camera_front_dev, &dev_attr_front_awb_module);

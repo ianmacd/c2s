@@ -472,15 +472,6 @@ static int getidx_mdnie_scenario_maptbl(struct maptbl *tbl)
 	return tbl->ncol * (mdnie->props.mode);
 }
 
-#ifdef CONFIG_SUPPORT_HMD
-static int getidx_mdnie_hmd_maptbl(struct maptbl *tbl)
-{
-	struct mdnie_info *mdnie = (struct mdnie_info *)tbl->pdata;
-
-	return tbl->ncol * (mdnie->props.hmd);
-}
-#endif
-
 static int getidx_mdnie_hdr_maptbl(struct maptbl *tbl)
 {
 	struct mdnie_info *mdnie = (struct mdnie_info *)tbl->pdata;
@@ -1217,39 +1208,3 @@ static int getidx_gamma_mode2_brt_table(struct maptbl *tbl)
 
 	return maptbl_index(tbl, 0, row, 0);
 }
-
-#ifdef CONFIG_DYNAMIC_FREQ
-
-static int getidx_dyn_ffc_table(struct maptbl *tbl)
-{
-	int row = 0, layer = 0;
-	struct df_status_info *status;
-	struct panel_device *panel = (struct panel_device *)tbl->pdata;
-
-	if (panel == NULL) {
-		panel_err("panel is null\n");
-		return -EINVAL;
-	}
-	status = &panel->df_status;
-
-	layer = status->current_ddi_osc;
-	if (layer >= MAX_EA8076_OSC) {
-		panel_warn("osc out of range %d %d, set to %d\n", layer, MAX_EA8076_OSC, EA8076_OSC_DEFAULT);
-		layer = status->current_ddi_osc = EA8076_OSC_DEFAULT;
-		status->request_ddi_osc = EA8076_OSC_DEFAULT;
-	}
-
-	row = status->ffc_df;
-	if (row >= EA8076_MAX_MIPI_FREQ) {
-		panel_warn("ffc out of range %d %d, set to %d\n", row,
-			EA8076_MAX_MIPI_FREQ, EA8076_DEFAULT_MIPI_FREQ);
-		row = status->ffc_df = EA8076_DEFAULT_MIPI_FREQ;
-	}
-
-	panel_info("ffc idx: %d, ddi_osc: %d, row: %d\n",
-			status->ffc_df, status->current_ddi_osc, row);
-
-	return maptbl_index(tbl, layer, row, 0);
-}
-
-#endif

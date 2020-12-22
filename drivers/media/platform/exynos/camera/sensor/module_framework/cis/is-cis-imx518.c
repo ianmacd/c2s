@@ -144,7 +144,7 @@ static int sensor_imx518_cis_set_tx_clock_init(struct v4l2_subdev *subdev)
 static int sensor_imx518_cis_set_tx_clock_apply(struct v4l2_subdev *subdev)
 {
 	const struct cam_tof_sensor_mode *cur_tx_sensor_mode;
-	int i, found = -1;
+	int i, found = -1, tx_freq_count = ARRAY_SIZE(sensor_imx518_supported_tx_freq);
 
 	cur_tx_sensor_mode = &sensor_imx518_tx_freq_sensor_mode[sensor_imx518_mode];
 
@@ -154,7 +154,7 @@ static int sensor_imx518_cis_set_tx_clock_apply(struct v4l2_subdev *subdev)
 		return -1;
 	}
 
-	for(i = 0; i < ARRAY_SIZE(sensor_imx518_supported_tx_freq); i++){
+	for(i = 0; i < tx_freq_count; i++){
 		if (sensor_imx518_rear_tx_freq == sensor_imx518_supported_tx_freq[i]){
 			found = i;
 			break;

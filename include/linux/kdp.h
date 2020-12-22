@@ -29,7 +29,6 @@ extern char __rkp_ro_start[], __rkp_ro_end[];
 extern struct cred init_cred;
 extern struct task_security_struct init_sec;
 extern int security_integrity_current(void);
-extern u8 rkp_ro_page(unsigned long addr);
 
 #ifdef CONFIG_KDP_NS
 void rkp_reset_mnt_flags(struct vfsmount *mnt,int flags);
@@ -62,6 +61,12 @@ enum __KDP_CMD_ID{
 	RKP_KDP_X60 = 0x60,
 };
 
+enum __KDP_CRED_TYPE {
+	KDP_CRED_JAR = 1,
+	KDP_TSEC_JAR = 2,
+	KDP_VFSMNT_JAR = 3,
+};
+
 typedef struct kdp_init_struct {
 #ifdef CONFIG_FASTUH_RKP
 	u64 _srodata;
@@ -92,6 +97,22 @@ typedef struct kdp_init_struct {
 		u64 ss_initialized_va;
 	}selinux;
 } kdp_init_t;
+
+#ifndef CONFIG_FASTUH_RKP
+/*Check whether the address belong to Cred Area*/
+static inline u8 rkp_ro_page(unsigned long addr)
+{
+	if(!rkp_cred_enable)
+		return (u8)0;
+	if((addr == ((unsigned long)&init_cred)) || 
+		(addr == ((unsigned long)&init_sec)))
+		return (u8)1;
+	else
+		return rkp_is_pg_protected(addr);
+}
+#else
+extern u8 rkp_ro_page(unsigned long addr);
+#endif
 
 /***************** KDP_NS *****************/
 #ifdef CONFIG_KDP_NS

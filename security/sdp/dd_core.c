@@ -706,7 +706,7 @@ static void dd_decrypt_work(struct work_struct *work) {
 #ifdef CONFIG_SDP_KEY_DUMP
 		} else {
 			dd_info("skip decryption for inner layer - ino : %ld, flag : 0x%04x\n",
-					__func__, __LINE__, req->info->inode->i_ino, req->info->policy.flags);
+					req->info->inode->i_ino, req->info->policy.flags);
 		}
 #endif
 		dd_req_state(req, DD_REQ_SUBMITTED);
@@ -808,7 +808,6 @@ int dd_submit_bio(struct dd_info *info, struct bio *bio) {
 #ifdef CONFIG_SDP_KEY_DUMP
 		} else {
 			req->u.bio.clone->bi_opf = 0;
-			req->u.bio.clone->bi_crypt_skip = 1;
 		}
 #endif
 
@@ -1242,7 +1241,9 @@ static dd_transaction_result __process_page_request_locked(
 
 	p = __get_next_user_req(t->control);
 	if(!p) {
+		spin_unlock(&proc->lock);
 		t->control = __get_next_ctr_page(t);
+		spin_lock(&proc->lock);
 		p = __get_next_user_req(t->control);
 	}
 
@@ -1298,8 +1299,10 @@ __acquires(proc->lock)
 			break;
 		}
 
+		spin_unlock(&proc->lock);
 		if(!t->control || __is_ctr_page_full(t->control))
 			t->control = __get_next_ctr_page(t);
+		spin_lock(&proc->lock);
 
 		dd_debug_req("req <processing>", DD_DEBUG_PROCESS, req);
 		dd_verbose("retrieve req [unique:%d] [code:%d] [ino:%ld] [num_pg:%d] [num_md:%d] [num_ctr:%d]\n",
@@ -1831,7 +1834,7 @@ static long dd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		req = find_req(proc, DD_REQ_PROCESSING, ioc.u.xattr.ino);
 		if (!req) {
-			dd_error("request not found for ino:%ld! unique:%d\n", req->ino, req->unique);
+			dd_error("request not found for ino:%ld!\n", ioc.u.xattr.ino);
 			return -EBADF;
 		}
 		inode = req->info->inode;
@@ -1872,7 +1875,7 @@ static long dd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		req = find_req(proc, DD_REQ_PROCESSING, ioc.u.xattr.ino);
 		if (!req) {
-			dd_error("request not found for ino:%ld! unique:%d\n", req->ino, req->unique);
+			dd_error("request not found for ino:%ld!\n", ioc.u.xattr.ino);
 			kfree(ioc_work);
 			return -EBADF;
 		}
@@ -1978,7 +1981,10 @@ enforce:
 
 		for (i = 0; i < group_info->ngroups; i++) {
 			kgid_t gid = group_info->gid[i];
-			snprintf(msg, 128, "%s %d", msg, gid.val);
+			if (gid.val == AID_VENDOR_DDAR_DE_ACCESS) {
+				snprintf(msg, 128, "%s %d", msg, gid.val);
+				break;
+			}
 		}
 		dd_info("%s\n", msg);
 	}

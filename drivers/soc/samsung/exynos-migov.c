@@ -11,7 +11,8 @@
 
 #include <soc/samsung/exynos-migov.h>
 #include <soc/samsung/exynos-dm.h>
-#include "../../gpu/arm/v_r20p0/platform/exynos/gpu_dvfs_api.h"
+
+#include "exynos-gpu-api.h"
 #include "../../video/fbdev/exynos/dpu30/decon.h"
 #include "../../../kernel/sched/ems/ems.h"
 
@@ -690,7 +691,6 @@ TUNABLE_ATTR_RW(gpu_bottleneck_thr);
 TUNABLE_ATTR_RW(gpu_ar_bottleneck_thr);
 TUNABLE_ATTR_RW(mif_bottleneck_thr);
 TUNABLE_ATTR_RW(mif_stats_ratio_bottleneck_thr);
-TUNABLE_ATTR_RW(frame_src);
 TUNABLE_ATTR_RW(uncontrol_fps_delta_up);
 TUNABLE_ATTR_RW(uncontrol_fps_delta_down);
 TUNABLE_ATTR_RW(dt_ctrl_en);
@@ -758,7 +758,6 @@ static struct attribute *migov_attrs[] = {
 	&dev_attr_gpu_ar_bottleneck_thr.attr,
 	&dev_attr_mif_bottleneck_thr.attr,
 	&dev_attr_mif_stats_ratio_bottleneck_thr.attr,
-	&dev_attr_frame_src.attr,
 	&dev_attr_uncontrol_fps_delta_up.attr,
 	&dev_attr_uncontrol_fps_delta_down.attr,
 	&dev_attr_dt_ctrl_en.attr,

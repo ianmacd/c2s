@@ -1275,6 +1275,7 @@ void __set_task_comm(struct task_struct *tsk, const char *buf, bool exec)
 	perf_event_comm(tsk, exec);
 }
 #ifdef CONFIG_KDP_NS
+extern int rkp_from_vfsmnt_cache(unsigned long addr);
 extern struct super_block *sys_sb;	/* pointer to superblock */
 extern struct super_block *odm_sb;	/* pointer to superblock */
 extern struct super_block *vendor_sb;	/* pointer to superblock */
@@ -1300,7 +1301,7 @@ static int invalid_drive(struct linux_binprm * bprm)
 	
 	vfsmnt = bprm->file->f_path.mnt;
 #ifdef CONFIG_FASTUH_RKP
-	if(!vfsmnt) {
+	if(!vfsmnt || !rkp_from_vfsmnt_cache((unsigned long)vfsmnt)) {
 #else
 	if(!vfsmnt || !rkp_ro_page((unsigned long)vfsmnt)) {
 #endif

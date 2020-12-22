@@ -559,6 +559,11 @@ Reduce_Link_Rate_Retry:
 		|| displayport_reg_phy_get_link_bw() != link_rate
 		|| displayport_reg_get_lane_count() != lane_cnt) {
 
+		if (decon->state == DECON_STATE_ON) {
+			displayport_info("phy_reset not permitted on decon on state\n");
+			return -EINVAL;
+		}
+
 		displayport_reg_phy_reset(1);
 		displayport_reg_phy_init_setting();
 
@@ -1045,6 +1050,20 @@ static int displayport_link_status_read(u32 sst_id)
 	return 0;
 }
 
+bool displayport_check_dex_ratio(enum video_ratio_t ratio)
+{
+	switch (ratio) {
+	case RATIO_16_9:
+	case RATIO_16_10:
+	case RATIO_21_9:
+		return true;
+	default:
+		break;
+	}
+
+	return false;
+}
+
 static void displayport_find_proper_ratio_video_for_dex(struct displayport_device *displayport)
 {
 	u32 sst_id = displayport_get_sst_id_with_decon_id(DEFAULT_DECON_ID);
@@ -1056,31 +1075,38 @@ static void displayport_find_proper_ratio_video_for_dex(struct displayport_devic
 	if (!displayport->dex_setting)
 		return;
 
-	if (best_ratio == RATIO_16_9 ||
-			best_ratio == RATIO_16_10 ||
-			best_ratio == RATIO_21_9) {
-		displayport_dbg("dex support ratio\n");
-	} else {
-		displayport_info("not dex support ratio\n");
-		return;
-	}
-
 	/* for test */
 	if (reduced_resolution) {
 		i = reduced_resolution;
 	}
 
-	/* find same ratio timing from best timing */
-	for (; i >= V1600X900P59; i--) {
-		if (supported_videos[i].edid_support_match &&
-				supported_videos[i].dex_support &&
-				supported_videos[i].ratio == best_ratio) {
-			displayport->dex_video_pick = i;
-			displayport_info("found dex support ratio: %s %d/%d\n",
-					supported_videos[i].name, i, best_ratio);
-			break;
+	/* find same or proper ratio timing from best timing */
+	if (displayport_check_dex_ratio(best_ratio)) {
+		for (; i >= V1600X900P59; i--) {
+			if (supported_videos[i].edid_support_match &&
+					supported_videos[i].dex_support &&
+					supported_videos[i].ratio == best_ratio) {
+				displayport->dex_video_pick = i;
+				displayport_info("found dex support ratio: %s %d/%d\n",
+						supported_videos[i].name, i, best_ratio);
+				break;
+			}
 		}
+	} else {
+#ifdef FEATURE_IGNORE_PREFER_IF_DEX_RES_EXIST
+		for (; i >= V1600X900P59; i--) {
+			if (supported_videos[i].edid_support_match &&
+					supported_videos[i].dex_support &&
+					displayport_check_dex_ratio(supported_videos[i].ratio)) {
+				displayport->dex_video_pick = i;
+				displayport_info("found dex support ratio: %s %d/%d\n",
+						supported_videos[i].name, i, best_ratio);
+				break;
+			}
+		}
+#endif
 	}
+
 	if (!displayport->dex_video_pick)
 		displayport_info("not found dex support ratio\n");
 }
@@ -4178,10 +4204,12 @@ static ssize_t dp_test_store(struct class *dev,
 			displayport_hpd_changed(val[2]);
 		break;
 	case 1:
-		if (val[2] == 0)
-			displayport_off_by_hpd_low(sst_id, displayport);
-		else if (val[2] == 1)
-			displayport_on_by_hpd_high(sst_id, displayport);
+		if (val[2] == 0) {
+			displayport_set_extcon_state(sst_id, displayport, 0);
+		} else if (val[2] == 1) {
+			edid_update(sst_id, displayport);
+			displayport_set_extcon_state(sst_id, displayport, 1);
+		}
 		break;
 	case 2:
 		if (val[2] == 0 || val[2] == 1)
@@ -4421,16 +4449,21 @@ static ssize_t dex_store(struct class *dev,
 	u32 sst_id = displayport_get_sst_id_with_decon_id(DEFAULT_DECON_ID);
 	int cur_video = displayport->sst[sst_id]->cur_video;
 	int best_video = displayport->sst[sst_id]->best_video;
+	int best_dex_video = displayport->dex_video_pick;
 	int mst_support = displayport->mst_cap;
-
 #ifdef FEATURE_MANAGE_HMD_LIST
+	int ret;
+
 	if (size >= MAX_DEX_STORE_LEN) {
 		displayport_err("invalid input size %lu\n", size);
 		return -EINVAL;
 	}
 
-	if (displayport_update_hmd_list(displayport, buf, size) != -EINVAL)
-		return -EINVAL;
+	ret = displayport_update_hmd_list(displayport, buf, size);
+	if (ret == 0) /* HMD list update success */
+		return size;
+	else if (ret != -EINVAL) /* try to update HMD list but error*/
+		return ret;
 #endif
 
 	if (kstrtouint(buf, 10, &val)) {
@@ -4493,31 +4526,24 @@ static ssize_t dex_store(struct class *dev,
 				}
 			}
 		} else {
-			displayport_dbg("current video: %d, best_video: %d\n", cur_video, best_video);
-			 if (displayport->dex_setting) {
+			displayport_dbg("current: %d, best: %d, best_dex: %d\n",
+						cur_video, best_video, best_dex_video);
+			if (displayport->dex_setting) {
 				/* if current resolution is dex supported, then do not reconnect */
 				if (supported_videos[cur_video].dex_support != DEX_NOT_SUPPORT &&
+#ifdef FEATURE_IGNORE_PREFER_IF_DEX_RES_EXIST
+					cur_video == best_dex_video &&
+#endif
 					supported_videos[cur_video].dex_support <= displayport->dex_adapter_type) {
 					displayport_info("current video support dex %d\n", cur_video);
 					need_reconnect = 0;
 				}
 			} else {
-#if 0//def FEATURE_USE_PREFERRED_TIMING_1ST /* works in the same way*/
-				if ((supported_videos[cur_video].dv_timings.bt.width
-					== supported_videos[best_video].dv_timings.bt.width) &&
-					(supported_videos[cur_video].dv_timings.bt.height
-						== supported_videos[best_video].dv_timings.bt.height) &&
-					(supported_videos[cur_video].fps == supported_videos[best_video].fps)) {
-					displayport_info("current video is best %d\n", cur_video);
-					need_reconnect = 0;
-				}
-#else
 				/* if current resolution is best, then do not reconnect */
 				if (cur_video == best_video) {
 					displayport_info("current video is best %d\n", cur_video);
 					need_reconnect = 0;
 				}
-#endif
 			}
 		}
 	}

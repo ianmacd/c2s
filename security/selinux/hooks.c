@@ -131,11 +131,11 @@ static inline unsigned int cmp_sec_integrity(const struct cred *cred,struct mm_s
 {
 	
 	if (cred->bp_task != current)
-		printk(KERN_ERR "KDP: cred->bp_task: %p, current: %p\n", 
+		pr_err("KDP: cred->bp_task: 0x%lx, current: 0x%lx\n",
 						cred->bp_task, current);
 
 	if (mm && (mm->pgd != cred->bp_pgd))
-		printk(KERN_ERR "KDP: mm: %p, mm->pgd: %p, cred->bp_pgd: %p\n", 
+		pr_err("KDP: mm: 0x%lx, mm->pgd: 0x%lx, cred->bp_pgd: 0x%lx\n",
 						mm, mm->pgd, cred->bp_pgd);
 
 	return ((cred->bp_task != current) || 
@@ -151,19 +151,19 @@ static inline unsigned int rkp_is_valid_cred_sp(u64 cred,u64 sp)
 		struct task_security_struct *tsec = (struct task_security_struct *)sp;
 
 		if((cred == (u64)&init_cred) && 
-			( sp == (u64)&init_sec)){
+			(sp == (u64)&init_sec)) {
 			return 0;
 		}
 		if (!rkp_ro_page(cred) || !rkp_ro_page(cred+sizeof(struct cred)) ||
 			(!rkp_ro_page(sp) || !rkp_ro_page(sp+sizeof(struct task_security_struct)))) {
-			printk(KERN_ERR, "KDP: rkp_ro_page: cred: %d, cred+sizeof(cred): %d, ", 
+			pr_err("KDP: rkp_ro_page: cred: %d, cred+sizeof(cred): %d, ",
 							rkp_ro_page((u64)cred), rkp_ro_page((u64)cred+sizeof(struct cred)));
-			printk(KERN_ERR, "rkp_ro_page(sp): %d, sp+sizeof(task_security_struct): %d\n", 
+			pr_err("rkp_ro_page(sp): %d, sp+sizeof(task_security_struct): %d\n",
 							rkp_ro_page(sp), rkp_ro_page(sp+sizeof(struct task_security_struct))); 
 			return 1;
 		}
 		if ((u64)tsec->bp_cred != cred) {
-			printk(KERN_ERR, "KDP: tesc->bp_cred: %p, cred: %p\n", 
+			pr_err("KDP: tesc->bp_cred: 0x%lx, cred: 0x%lx\n",
 							(u64)tsec->bp_cred, cred);
 			return 1;
 		}
@@ -215,7 +215,7 @@ int selinux_enforcing;
 static int __init enforcing_setup(char *str)
 {
 	unsigned long enforcing;
-	if (!kstrtoul(str, 0, &enforcing))
+	if (!kstrtoul(str, 0, &enforcing)){
 // [ SEC_SELINUX_PORTING_COMMON
 #ifdef CONFIG_ALWAYS_ENFORCE
 		selinux_enforcing_boot = 1;
@@ -224,6 +224,7 @@ static int __init enforcing_setup(char *str)
 		selinux_enforcing_boot = enforcing ? 1 : 0;
 		selinux_enforcing = enforcing ? 1 : 0;
 #endif
+	}
 // ] SEC_SELINUX_PORTING_COMMON
 	return 1;
 }

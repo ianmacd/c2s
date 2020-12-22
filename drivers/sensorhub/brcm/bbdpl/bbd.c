@@ -133,6 +133,12 @@ static struct bbd_device bbd;
  * Embedded patch file provided as /dev/bbd_patch
  */
 
+int android_version = 10;
+
+struct patch_entry {
+	unsigned char *data;
+	int size;
+};
 
 static unsigned char bbd_patch_old[] = {
 #if defined(CONFIG_SENSORS_SSP_CANVAS)
@@ -146,8 +152,7 @@ static unsigned char bbd_patch_old[] = {
 #endif
 };
 
-
-static unsigned char bbd_patch[] = {
+static unsigned char bbd_patch_Q[] = {
 #if defined(CONFIG_SENSORS_SSP_CANVAS)
 #include "q_os/bbd_patch_file_canvas.h"
 #elif defined(CONFIG_SENSORS_SSP_PICASSO)
@@ -156,6 +161,18 @@ static unsigned char bbd_patch[] = {
 #include "q_os/bbd_patch_file_r8.h"
 #else
 #include "q_os/bbd_patch_file_picasso.h"
+#endif
+};
+
+static unsigned char bbd_patch_R[] = {
+#if defined(CONFIG_SENSORS_SSP_CANVAS)
+#include "r_os/bbd_patch_file_canvas.h"
+#elif defined(CONFIG_SENSORS_SSP_PICASSO)
+#include "r_os/bbd_patch_file_picasso.h"
+#elif defined(CONFIG_SENSORS_SSP_R8)
+#include "r_os/bbd_patch_file_r8.h"
+#else
+#include "r_os/bbd_patch_file_picasso.h"
 #endif
 };
 
@@ -389,8 +406,9 @@ ssize_t bbd_pull_packet(unsigned char *buf, size_t size, unsigned int timeout_ms
 	struct circ_buf *circ = &bbd.priv[BBD_MINOR_SHMD].read_buf;
 	size_t rd_size = 0;
 
-	WARN_ON(!buf);
-	WARN_ON(!size);
+
+//	WARN_ON(!buf);
+//	WARN_ON(!size);
 
 	if (timeout_ms) {
 		int ret = wait_event_interruptible_timeout(
@@ -538,8 +556,11 @@ ssize_t bbd_control(const char *buf, ssize_t len)
 		if (current == bbd.lk.lhd) {
 			pr_info("[SSPBBD] Patch Done Timer Off\n");
 			bbd_disable_lk();
-		}
+	} 
 #endif /* CONFIG_LHD_KILLER */
+	} else if (strstr(buf, BBD_CTRL_ANDROID_VERSION)) {
+		int ret = kstrtoint(buf + strlen(BBD_CTRL_ANDROID_VERSION), 10, &android_version);
+		pr_info("android version = %d(%d)", android_version, ret);
 	} else if (bbd.ssp_cb && bbd.ssp_cb->on_control) {
 		/* Tell SHMD about the unknown control string */
 		bbd.ssp_cb->on_control(bbd.ssp_priv, buf);
@@ -599,9 +620,6 @@ static int bbd_common_release(struct inode *inode, struct file *filp)
 {
 	unsigned int minor = iminor(inode);
 
-	BUG_ON(minor >= BBD_DEVICE_INDEX);
-
-	pr_info("%s[%s]++\n", __func__, bbd.priv[minor].name);
 	bbd.priv[minor].busy = false;
 	if (minor == BBD_MINOR_SENSOR) {
 		spin_lock(&bbd.lk.lock);
@@ -625,7 +643,6 @@ static ssize_t bbd_common_read(struct file *filp, char __user *buf, size_t size,
 	struct circ_buf *circ = &bbd.priv[minor].read_buf;
 	size_t rd_size = 0;
 
-	BUG_ON(minor >= BBD_DEVICE_INDEX);
 	//pr_info("%s[%s]++\n", __func__, bbd.priv[minor].name);
 
 	mutex_lock(&bbd.priv[minor].lock);
@@ -636,8 +653,11 @@ static ssize_t bbd_common_read(struct file *filp, char __user *buf, size_t size,
 	do {
 		size_t cnt_to_end = CIRC_CNT_TO_END(circ->head, circ->tail, BBD_BUFF_SIZE);
 		size_t copied = min(cnt_to_end, size);
+		int ret = copy_to_user(buf + rd_size, (void *) circ->buf + circ->tail, copied);
+		
+		if (ret < 0)
+			pr_err("[SSPBBD] %s: copy_to_user error(%d)", __func__, ret);
 
-		WARN_ON(copy_to_user(buf + rd_size, (void *) circ->buf + circ->tail, copied));
 		size -= copied;
 		rd_size += copied;
 		circ->tail = (circ->tail + copied) & (BBD_BUFF_SIZE - 1);
@@ -664,12 +684,15 @@ static ssize_t bbd_common_write(struct file *filp, const char __user *buf, size_
 {
 	unsigned int minor = iminor(filp->f_path.dentry->d_inode);
 	//struct bbd_device *bbd = filp->private_data;
+	int ret = 0;
 
 	//BUG_ON(size >= BBD_BUFF_SIZE);
 	if (size >= BBD_BUFF_SIZE)
 		return -EINVAL;
 
-	WARN_ON(copy_from_user(bbd.priv[minor].write_buf, buf, size));
+	ret = copy_from_user(bbd.priv[minor].write_buf, buf, size);
+	if (ret < 0)
+		pr_err("[SSPBBD] %s: copy_from_user error(%d)", __func__, ret);
 
 #ifdef DEBUG_1HZ_STAT
 	bbd_update_stat(STAT_TX_LHD, size);
@@ -687,8 +710,6 @@ static unsigned int bbd_common_poll(struct file *filp, poll_table *wait)
 	//struct bbd_device *bbd = filp->private_data;
 	struct circ_buf *circ = &bbd.priv[minor].read_buf;
 	unsigned int mask = 0;
-
-	BUG_ON(minor >= BBD_DEVICE_INDEX);
 
 	poll_wait(filp, &bbd.priv[minor].poll_wait, wait);
 
@@ -794,14 +815,28 @@ ssize_t bbd_control_write(struct file *filp, const char __user *buf, size_t size
 
 extern int get_patch_version(int ap_type, int hw_rev);
 
+int get_patch(unsigned char **patch) {
+	switch(android_version) {
+		case 10:
+			*patch = bbd_patch_Q;
+			return sizeof(bbd_patch_Q);
+		case 11:
+			*patch = bbd_patch_R;
+			return sizeof(bbd_patch_R);
+		default:
+			*patch = bbd_patch_Q;
+			return sizeof(bbd_patch_Q);
+	}
+}
+
 ssize_t bbd_patch_read(struct file *filp, char __user *buf, size_t size, loff_t *ppos)
 {
 	size_t  offset = filp->f_pos;
 	int hw_rev = bbd.ssp_cb->on_control(bbd.ssp_priv, SSP_GET_HW_REV);
 	int ap_type = bbd.ssp_cb->on_control(bbd.ssp_priv, SSP_GET_AP_REV);
 	int patch_ver = get_patch_version(ap_type, hw_rev);
-
-	int patch_size = patch_ver == bbd_old ? sizeof(bbd_patch_old) : sizeof(bbd_patch);
+	unsigned char *bbd_patch = NULL;
+	int patch_size = patch_ver == bbd_old ? sizeof(bbd_patch_old) : get_patch(&bbd_patch);
 	ssize_t rd_size = patch_size < size ? patch_size : size;
 
 	if (offset >= patch_size) {	   /* signal EOF */
@@ -1246,7 +1281,7 @@ int bbd_init(struct device *dev)
 	/* Create class which is required for device_create() */
 	bbd.class = class_create(THIS_MODULE, "bbd");
 	if (IS_ERR(bbd.class)) {
-		WARN("BBD:%s() failed to create class \"bbd\"", __func__);
+		pr_err("BBD:%s() failed to create class \"bbd\"", __func__);
 		goto exit;
 	}
 
@@ -1301,23 +1336,28 @@ int bbd_init(struct device *dev)
 
 	/* Register sysfs entry */
 	bbd.kobj = kobject_create_and_add("bbd", NULL);
-	BUG_ON(!bbd.kobj);
+	if (!bbd.kobj) {
+		pr_err("BBD:%s() failed", __func__);
+		goto free_class;
+	}
+
 	ret = sysfs_create_group(bbd.kobj, &bbd_group);
-	if (ret < 0) {
-		pr_err("%s failed to sysfs_create_group \"bbd\", ret = %d",
-							__func__, ret);
+	if (ret) {
+		pr_err("BBD:%s() failed. ret = %d", __func__, ret);
 		goto free_kobj;
 	}
 
 
 	/* Register PM */
 	ret = register_pm_notifier(&bbd_notifier_block);
-	BUG_ON(ret);
-
+	if (ret) {
+		pr_err("BBD:%s() failed. ret = %d", __func__, ret);
+		goto remove_group;
+	}
 #ifdef CONFIG_SENSORS_SSP
 	/* Now, we can initialize SSP */
-	BUG_ON(device_register(&dummy_spi.dev));
-	{
+	ret = device_register(&dummy_spi.dev);
+	if (ret == 0) {
 		struct spi_device *spi = to_spi_device(dev);
 		void *org_priv, *new_priv;
 
@@ -1326,7 +1366,9 @@ int bbd_init(struct device *dev)
 		new_priv = spi_get_drvdata(spi);
 		spi_set_drvdata(spi, org_priv);
 		spi_set_drvdata(&dummy_spi, new_priv);
-
+	} else {
+		pr_err("BBD:%s() failed, ret = %d", __func__, ret);
+		goto unregister_pm;
 	}
 #endif
 	ts1 = ktime_to_timespec(ktime_get_boottime());
@@ -1342,6 +1384,10 @@ int bbd_init(struct device *dev)
 #endif
 	return 0;
 
+unregister_pm:
+	unregister_pm_notifier(&bbd_notifier_block);
+remove_group:
+	sysfs_remove_group(bbd.kobj, &bbd_group);
 free_kobj:
 	kobject_put(bbd.kobj);
 free_class:
@@ -1366,6 +1412,7 @@ static void __exit bbd_exit(void)
 	/* Shutdown SSP first*/
 	pssp_driver->shutdown(&dummy_spi);
 #endif
+	unregister_pm_notifier(&bbd_notifier_block);
 
 	/* Remove sysfs entry */
 	sysfs_remove_group(bbd.kobj, &bbd_group);

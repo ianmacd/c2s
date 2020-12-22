@@ -355,6 +355,9 @@ int dsim_write_cmd_set(struct dsim_device *dsim, struct exynos_dsim_cmd cmd_list
 		goto err_exit;
 	}
 
+	/* force to exit pll sleep before starting command transfer */
+	dpu_pll_sleep_mask(decon);
+
 	/* check PH available */
 	if (!dsim_check_ph_threshold(dsim, cmd_cnt)) {
 		ret = -EINVAL;
@@ -376,9 +379,6 @@ int dsim_write_cmd_set(struct dsim_device *dsim, struct exynos_dsim_cmd cmd_list
 		dsim_err("DSIM cmd wr timeout @ line count '0', pl_cnt @ = %d\n", dsim->pl_cnt);
 		goto err_exit;
 	}
-
-	/* force to exit pll sleep before starting command transfer */
-	dpu_pll_sleep_mask(decon);
 
 	for (i = 0; i < set.cnt; i++) {
 
@@ -475,6 +475,9 @@ int dsim_write_data(struct dsim_device *dsim, u32 id, unsigned long d0, u32 d1, 
 		goto err_exit;
 	}
 
+	/* force to exit pll sleep before starting command transfer */
+	dpu_pll_sleep_mask(decon);
+
 	reinit_completion(&dsim->ph_wr_comp);
 	dsim_reg_clear_int(dsim->id, DSIM_INTSRC_SFR_PH_FIFO_EMPTY);
 
@@ -491,9 +494,6 @@ int dsim_write_data(struct dsim_device *dsim, u32 id, unsigned long d0, u32 d1, 
 		dsim_err("ID(%d): DSIM cmd wr timeout @ line count '0' 0x%lx, pl_cnt = %d\n", id, d0, dsim->pl_cnt);
 		goto err_exit;
 	}
-
-	/* force to exit pll sleep before starting command transfer */
-	dpu_pll_sleep_mask(decon);
 
 	/* Run write-fail dectector */
 	mod_timer(&dsim->cmd_timer, jiffies + MIPI_WR_TIMEOUT);

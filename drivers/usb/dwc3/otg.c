@@ -44,7 +44,7 @@
 #define OTG_DEVICE_CONNECT	2
 #define LINK_DEBUG_L		(0x0C)
 #define LINK_DEBUG_H		(0x10)
-#define BUS_ACTIVITY_CHECK (0x3F << 16)
+#define BUS_ACTIVITY_CHECK	(0x3F << 16)
 #define READ_TRANS_OFFSET	10
 
 struct dwc3 *g_dwc;
@@ -224,7 +224,7 @@ void dwc3_otg_check_bus_act(struct dwc3 *dwc)
 {
 	u32 reg;
 	u32 xm_wtran, xm_rtran, xm_ch_status;
-	int retries = 100;
+	int retries = 300;
 
 	reg = dwc3_readl(dwc->regs, DWC3_GDBGLSPMUX);
 	reg |= BUS_ACTIVITY_CHECK;

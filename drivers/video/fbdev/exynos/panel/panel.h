@@ -55,6 +55,7 @@ enum {
 #define CONFIG_SUPPORT_PANEL_SWAP
 #define CONFIG_SUPPORT_XTALK_MODE
 #define CONFIG_SUPPORT_ISC_DEFECT
+#define CONFIG_SUPPORT_BRIGHTDOT_TEST
 #define CONFIG_SELFMASK_FACTORY
 #endif
 
@@ -802,6 +803,7 @@ enum PANEL_SEQ {
 
 #ifdef CONFIG_DYNAMIC_FREQ
 	PANEL_DYNAMIC_FFC_SEQ,
+	PANEL_DYNAMIC_FFC_OFF_SEQ,
 	PANEL_COMP_LTPS_SEQ,
 #endif
 #ifdef CONFIG_SUPPORT_MAFPC
@@ -821,8 +823,12 @@ enum PANEL_SEQ {
 	PANEL_CHECK_CONDITION_SEQ,
 	PANEL_DIA_ONOFF_SEQ,
 #ifdef CONFIG_SUPPORT_MASK_LAYER
+	PANEL_MASK_LAYER_STOP_DIMMING_SEQ,
 	PANEL_MASK_LAYER_BEFORE_SEQ,
 	PANEL_MASK_LAYER_AFTER_SEQ,
+#endif
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+	PANEL_BRIGHTDOT_TEST_SEQ,
 #endif
 	PANEL_DUMMY_SEQ,
 	MAX_PANEL_SEQ,
@@ -898,27 +904,6 @@ struct panel_vrr {
 	int aid_cycle;
 };
 
-#ifdef CONFIG_PANEL_VRR_BRIDGE
-struct vrr_bridge_step {
-	int frame_delay;
-	struct panel_vrr *vrr;
-};
-
-struct panel_vrr_bridge {
-	int nr_fps_table;
-	int origin_fps;
-	int origin_mode;
-	int origin_aid_cycle;
-	int target_fps;
-	int target_mode;
-	int target_aid_cycle;
-	int min_actual_brt;
-	int max_actual_brt;
-	struct vrr_bridge_step *step;
-	int nr_step;
-};
-#endif
-
 struct panel_resol {
 	unsigned int w;
 	unsigned int h;
@@ -928,10 +913,6 @@ struct panel_resol {
 	} comp_param;
 	struct panel_vrr **available_vrr;
 	unsigned int nr_available_vrr;
-#ifdef CONFIG_PANEL_VRR_BRIDGE
-	struct panel_vrr_bridge *bridge_rr;
-	unsigned int nr_bridge_rr;
-#endif
 };
 
 struct panel_mres {
@@ -965,6 +946,25 @@ struct mask_layer_data {
 #endif
 
 #if defined(CONFIG_PANEL_DISPLAY_MODE)
+struct common_panel_display_mode_bridge_ops {
+	/*
+	 * check if to change bridge refresh rate is permitted.
+	 * (e.g. actual brightness 98nit ~ 420nit)
+	 */
+	bool (*check_changeable)(struct panel_device *panel);
+
+	/*
+	 * check if to jump to target refresh rate is permitted directly.
+	 * (e.g. brightness, outdoor light level, copr or image updated)
+	 */
+	bool (*check_jumpmode)(struct panel_device *panel);
+};
+
+struct common_panel_display_mode_bridge {
+	struct common_panel_display_mode *mode;
+	int nframe_duration;
+};
+
 struct common_panel_display_mode {
 	char name[PANEL_DISPLAY_MODE_NAME_LEN];
 	struct panel_resol *resol;
@@ -974,6 +974,8 @@ struct common_panel_display_mode {
 struct common_panel_display_modes {
 	unsigned int num_modes;
 	struct common_panel_display_mode **modes;
+	struct common_panel_display_mode_bridge	*bridges;
+	struct common_panel_display_mode_bridge_ops *bridge_ops;
 };
 #endif
 
@@ -1248,6 +1250,9 @@ struct panel_properties {
 	u8 *gamma_control_buf;
 	u32 panel_partial_disp;
 	u32 panel_mode;
+#ifdef CONFIG_PANEL_VRR_BRIDGE
+	u32 target_panel_mode;
+#endif
 	/* resolution */
 	bool mres_updated;
 	u32 mres_mode;
@@ -1256,18 +1261,13 @@ struct panel_properties {
 	/* variable refresh rate */
 	u32 vrr_fps;
 	u32 vrr_mode;
-	u32 vrr_aid_cycle;
 	u32 vrr_idx;
+	/* original variable refresh rate */
 	u32 vrr_origin_fps;
 	u32 vrr_origin_mode;
-	u32 vrr_origin_aid_cycle;
 	u32 vrr_origin_idx;
 #ifdef CONFIG_PANEL_VRR_BRIDGE
 	bool vrr_bridge_enable;
-	u32 vrr_target_fps;
-	u32 vrr_target_mode;
-	u32 vrr_target_aid_cycle;
-	struct panel_vrr_bridge *bridge;
 #endif
 	bool vrr_updated;
 	struct vrr_lfd_info vrr_lfd_info;
@@ -1276,6 +1276,9 @@ struct panel_properties {
 	u32 conn_det_enable;
 #if defined(CONFIG_SEC_FACTORY) && defined(CONFIG_SUPPORT_FAST_DISCHARGE)
 	u32 enable_fd;
+#endif
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+	u32 brightdot_test_enable;
 #endif
 };
 
@@ -1420,6 +1423,7 @@ int panel_verify_tx_packet(struct panel_device *panel, u8 *src, u8 ofs, u8 len);
 int panel_set_key(struct panel_device *panel, int level, bool on);
 struct pktinfo *alloc_static_packet(char *name, u32 type, u8 *data, u32 dlen);
 int check_panel_active(struct panel_device *panel, const char *caller);
+int panel_dsi_wait_for_vsync(struct panel_device *panel, u32 timeout);
 #if defined(CONFIG_PANEL_DISPLAY_MODE)
 bool panel_display_mode_is_supported(struct panel_device *panel);
 #endif

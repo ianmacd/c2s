@@ -51,6 +51,7 @@
 #define DISPLAYID_EXT 0x70
 #define FEATURE_USE_PREFERRED_TIMING_1ST
 #define FEATURE_MANAGE_HMD_LIST
+/*#define FEATURE_IGNORE_PREFER_IF_DEX_RES_EXIST*/
 
 #define MST_MAX_VIDEO_FOR_DEX V2560X1600P60
 #define MST_MAX_VIDEO_FOR_MIRROR V4096X2160P30
@@ -1202,7 +1203,6 @@ extern struct hdcp13_info hdcp13_info;
 
 #define USBDP_PHY_CONTROL 0x15860704
 
-
 enum{
 	LINK_CHECK_PASS = 0,
 	LINK_CHECK_NEED = 1,
@@ -1451,6 +1451,7 @@ int edid_find_resolution(u16 xres, u16 yres, u16 refresh);
 u8 edid_read_checksum(void);
 u32 edid_audio_informs(void);
 bool edid_support_pro_audio(void);
+bool displayport_check_dex_ratio(enum video_ratio_t ratio);
 
 void displayport_reg_set_avi_infoframe(u32 sst_id, struct infoframe avi_infofrmae);
 void displayport_reg_set_spd_infoframe(u32 sst_id, struct infoframe spd_infofrmae);

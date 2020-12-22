@@ -53,7 +53,7 @@ static dev_t find_devt_for_test(struct exynos_fmp *fmp,
 			}
 		}
 		if (!idx) {
-			mdelay(100);
+			msleep(100);
 			count++;
 			continue;
 		}

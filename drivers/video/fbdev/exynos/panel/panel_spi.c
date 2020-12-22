@@ -361,7 +361,7 @@ static int panel_spi_execute_cmd_retry(struct panel_spi_dev *spi_dev, struct spi
 static int panel_spi_flash_init(struct panel_spi_dev *spi_dev)
 {
 	struct spi_dev_info *spi_info = &spi_dev->spi_info;
-	u32 i;
+	size_t i;
 	int ret = 0;
 	const int q[] = {
 		PANEL_SPI_CMD_FLASH_WRITE_ENABLE,
@@ -394,7 +394,7 @@ static int panel_spi_flash_init(struct panel_spi_dev *spi_dev)
 static int panel_spi_flash_exit(struct panel_spi_dev *spi_dev)
 {
 	struct spi_dev_info *spi_info = &spi_dev->spi_info;
-	u32 i;
+	size_t i;
 	int ret = 0;
 	const int q[] = {
 		PANEL_SPI_CMD_FLASH_WRITE_ENABLE,
@@ -884,14 +884,14 @@ static int panel_spi_fops_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t panel_spi_fops_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+static ssize_t panel_spi_fops_read(struct file *file, char __user *buf, size_t len, loff_t *ppos)
 {
 	struct panel_spi_dev *spi_dev = file->private_data;
 	struct panel_device *panel = container_of(spi_dev, struct panel_device, panel_spi_dev);
 	struct spi_data_packet spi_data_buf;
 	int ret;
 	u8 *read_buf;
-	u32 read_addr, read_done = 0, read_size = 0;
+	u32 read_addr, read_done = 0, read_size = 0, count = (u32)len;
 	loff_t empty_pos = 0;
 	ssize_t res;
 
@@ -955,13 +955,13 @@ static ssize_t panel_spi_fops_read(struct file *file, char __user *buf, size_t c
 	return count;
 }
 
-static ssize_t panel_spi_fops_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+static ssize_t panel_spi_fops_write(struct file *file, const char __user *buf, size_t len, loff_t *ppos)
 {
 	struct panel_spi_dev *spi_dev = file->private_data;
 	struct panel_device *panel = container_of(spi_dev, struct panel_device, panel_spi_dev);
 	struct spi_data_packet spi_data_buf;
 	u8 *write_buf;
-	u32 write_addr, write_done = 0, write_size;
+	u32 write_addr, write_done = 0, write_size, count = (u32)len;
 	loff_t empty_pos = 0;
 	ssize_t res;
 
@@ -1044,12 +1044,15 @@ static int __ioctl_check_state(struct panel_spi_dev *spi_dev, unsigned long arg)
 
 static int __ioctl_erase(struct panel_spi_dev *spi_dev, unsigned long arg)
 {
-	struct ioc_erase_info erase_info;
-	struct spi_data_packet spi_data_buf;
+	struct ioc_erase_info erase_info = { 0, };
+	struct spi_data_packet spi_data_buf = { 0, };
 	int ret;
 
-	copy_from_user(&erase_info, (struct ioc_erase_info __user *)arg,
-			sizeof(struct ioc_erase_info));
+	if (copy_from_user(&erase_info, (struct ioc_erase_info __user *)arg,
+			sizeof(struct ioc_erase_info))) {
+		panel_err("invalid data\n");
+		return -EINVAL;
+	}
 
 	if (erase_info.offset % SZ_4K != 0) {
 		panel_err("offset must be 4K aligned value\n");
@@ -1066,9 +1069,8 @@ static int __ioctl_erase(struct panel_spi_dev *spi_dev, unsigned long arg)
 	spi_data_buf.type = PANEL_SPI_PACKET_TYPE_ERASE_NONBLOCK;
 
 	ret = panel_spi_flash_erase(spi_dev, &spi_data_buf);
-	if (ret < 0) {
+	if (ret < 0)
 		panel_err("failed to erase %d", ret);
-	}
 
 	return ret;
 

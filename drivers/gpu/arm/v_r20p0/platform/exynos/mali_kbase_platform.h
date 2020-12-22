@@ -46,9 +46,9 @@ do { \
 #define CPU_MAX INT_MAX
 #define DVFS_TABLE_COL_NUM 8
 #define DVFS_TABLE_ROW_MAX 20
-#define OF_DATA_NUM_MAX 100
+#define OF_DATA_NUM_MAX 160
 #define PRE_FRAME 3
-#define WINDOW (4 * PRE_FRAME)	/* If DVFS Period is 4-ms, Total WINDOW has 4-ms * 4 = 16-ms */
+#define WINDOW (4 * PRE_FRAME) /* If DVFS Period is 4-ms, Total WINDOW has 4-ms * 4 = 16-ms */
 
 #ifdef CONFIG_MALI_SEC_G3D_PERF_STABLE_PMQOS
 #define STAY_COUNT_NO_PEAK_MODE_PERIOD 20   /* STAY_COUNT_NO_PEAK_MODE x 30ms(dvfs period) */
@@ -164,7 +164,9 @@ typedef struct _gpu_dvfs_info {
 	int max_threshold;
 	int down_staycount;
 	unsigned long long time;
+#ifdef CONFIG_MALI_TSG
 	unsigned long long time_busy;
+#endif
 	int mem_freq;
 	int int_freq;
 	int cpu_little_min_freq;
@@ -237,8 +239,10 @@ struct exynos_context {
 	int user_min_lock[NUMBER_LOCK];
 	int down_requirement;
 	int governor_type;
+#ifdef CONFIG_MALI_TSG
 	int governor_type_init;
 	int is_gov_set;
+#endif
 	bool wakeup_lock;
 	int dvfs_pending;
 
@@ -388,6 +392,8 @@ struct exynos_context {
 #endif
 
 	int gpu_operation_mode_info;
+
+#ifdef CONFIG_MALI_TSG
 	struct {
 		int util_history[2][WINDOW];
 		int freq_history[WINDOW];
@@ -405,11 +411,11 @@ struct exynos_context {
 	} prediction;
 
 	int freq_margin;
-	int migov_mode;
-	int migov_saved_polling_speed;
-	bool is_pm_qos_tsg;	/* true : cpu pmqos unlock for joint governor */
-
-int wa_frame_cnt;
+   	int migov_mode;
+   	int migov_saved_polling_speed;
+   	bool is_pm_qos_tsg; /* true : cpu pmqos unlock for joint governor */
+#endif
+   	int wa_frame_cnt;
 };
 
 struct kbase_device *gpu_get_device_structure(void);

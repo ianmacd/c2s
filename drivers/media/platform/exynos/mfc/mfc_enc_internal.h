@@ -2342,7 +2342,7 @@ static struct v4l2_queryctrl controls[] = {
 		.type = V4L2_CTRL_TYPE_INTEGER,
 		.name = "Transfer characteristics",
 		.minimum = 0,
-		.maximum = 17,
+		.maximum = 18,
 		.step = 1,
 		.default_value = 0,
 	},

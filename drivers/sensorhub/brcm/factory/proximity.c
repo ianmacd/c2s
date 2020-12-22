@@ -805,8 +805,10 @@ void initialize_prox_factorytest(struct ssp_data *data)
 #ifdef CONFIG_SENSORS_TMD4907
 	push_back(&prox_manager, "TMD4907", get_prox_tmd4907());
 #endif
+#ifndef CONFIG_SENSORS_SSP_R8
 	sensors_register(data->prox_device, data,
 		prox_attrs, "proximity_sensor");
+#endif
 }
 
 void remove_prox_factorytest(struct ssp_data *data)

@@ -34,8 +34,8 @@
 	!defined(CONFIG_KLAT) && \
 	(defined(CONFIG_SOC_EXYNOS9830) || defined(CONFIG_SOC_EXYNOS9820))
 #define MCPS_IF_ADDR_MAX 8
-static __be32 __mcps_in_addr[MCPS_IF_ADDR_MAX];
-static struct in6_addr __mcps_in6_addr[MCPS_IF_ADDR_MAX];
+__visible_for_testing __be32 __mcps_in_addr[MCPS_IF_ADDR_MAX];
+__visible_for_testing struct in6_addr __mcps_in6_addr[MCPS_IF_ADDR_MAX];
 
 int check_mcps_in6_addr(struct in6_addr *addr)
 {
@@ -63,7 +63,7 @@ int check_mcps_in_addr(__be32 addr)
 		 );
 }
 
-static int set_mcps_in_addr(const char *buf, const struct kernel_param *kp)
+__visible_for_testing int set_mcps_in_addr(const char *buf, const struct kernel_param *kp)
 {
 	unsigned int num = 0;
 
@@ -79,10 +79,6 @@ static int set_mcps_in_addr(const char *buf, const struct kernel_param *kp)
 
 	temp = copy;
 	substr = strsep(&temp, "@");
-	if (!substr) {
-		MCPS_ERR("No device num substring\n");
-		goto error;
-	}
 
 	if (kstrtouint(substr, 0, &num)) {
 		MCPS_ERR("Fail to parse uint\n");
@@ -95,7 +91,7 @@ static int set_mcps_in_addr(const char *buf, const struct kernel_param *kp)
 	}
 
 	substr = strsep(&temp, "@");
-	if (!substr) {
+	if (!substr || !strcmp("", substr)) {
 		MCPS_ERR("No ip addr substring\n");
 		goto error;
 	}
@@ -108,7 +104,7 @@ error:
 	return len;
 }
 
-static int get_mcps_in_addr(char *buf, const struct kernel_param *kp)
+__visible_for_testing int get_mcps_in_addr(char *buf, const struct kernel_param *kp)
 {
 	int i = 0;
 	int len = 0;
@@ -132,7 +128,7 @@ module_param_cb(mcps_in_addr,
 
 int in6_pton(const char *src, int srclen, u8 *dst, int delim, const char **end);
 
-static int set_mcps_in6_addr(const char *buf, const struct kernel_param *kp)
+__visible_for_testing int set_mcps_in6_addr(const char *buf, const struct kernel_param *kp)
 {
 	struct in6_addr val;
 	unsigned int num = 0;
@@ -149,10 +145,6 @@ static int set_mcps_in6_addr(const char *buf, const struct kernel_param *kp)
 
 	temp = copy;
 	substr = strsep(&temp, "@");
-	if (!substr) {
-		MCPS_ERR("No device num substring\n");
-		goto error;
-	}
 
 	if (kstrtouint(substr, 0, &num)) {
 		MCPS_ERR("Fail to parse uint\n");
@@ -165,7 +157,7 @@ static int set_mcps_in6_addr(const char *buf, const struct kernel_param *kp)
 	}
 
 	substr = strsep(&temp, "@");
-	if (!substr) {
+	if (!substr || !strcmp("", substr)) {
 		MCPS_ERR("No ip addr substring\n");
 		goto error;
 	}
@@ -181,7 +173,7 @@ error:
 	return len;
 }
 
-static int get_mcps_in6_addr(char *buf, const struct kernel_param *kp)
+__visible_for_testing int get_mcps_in6_addr(char *buf, const struct kernel_param *kp)
 {
 	int i = 0;
 	int len = 0;
@@ -264,6 +256,17 @@ struct arps_meta *get_newflow_rcu(void)
 	return get_arps_rcu();
 }
 
+static int create_and_copy_arps_mask(cpumask_var_t *dst, cpumask_var_t *src)
+{
+	if (!zalloc_cpumask_var(dst, GFP_KERNEL)) {
+		MCPS_DEBUG("failed to alloc kmem\n");
+		return -ENOMEM;
+	}
+
+	cpumask_copy(*dst, *src);
+	return 0;
+}
+
 static int create_arps_mask(const char *buf, cpumask_var_t *mask)
 {
 	int len, err;
@@ -320,6 +323,14 @@ static struct rps_map *create_arps_map(cpumask_var_t mask)
 	return create_arps_map_and(mask, cpu_possible_mask);
 }
 
+static void release_arps_map(struct rps_map *maps[NR_CLUSTER])
+{
+	kfree(maps[ALL_CLUSTER]);
+	kfree(maps[LIT_CLUSTER]);
+	kfree(maps[BIG_CLUSTER]);
+	kfree(maps[MID_CLUSTER]);
+}
+
 static void release_arps_meta(struct arps_meta *meta)
 {
 	if (!meta)
@@ -327,21 +338,37 @@ static void release_arps_meta(struct arps_meta *meta)
 
 	if (cpumask_available(meta->mask))
 		free_cpumask_var(meta->mask);
-	if (ARPS_MAP(meta, ALL_CLUSTER))
-		kfree(ARPS_MAP(meta, ALL_CLUSTER));
-	if (ARPS_MAP(meta, LIT_CLUSTER))
-		kfree(ARPS_MAP(meta, LIT_CLUSTER));
-	if (ARPS_MAP(meta, BIG_CLUSTER))
-		kfree(ARPS_MAP(meta, BIG_CLUSTER));
-	if (ARPS_MAP(meta, MID_CLUSTER))
-		kfree(ARPS_MAP(meta, MID_CLUSTER));
+
+	release_arps_map(meta->maps);
 
 	kfree(meta);
 }
 
-struct arps_meta *create_arps_meta(const char *buf)
+int init_arps_map(struct rps_map *maps[NR_CLUSTER], cpumask_var_t mask)
 {
-	struct arps_meta *meta;
+	maps[ALL_CLUSTER] = create_arps_map(mask);
+	if (!maps[ALL_CLUSTER])
+		goto fail;
+	maps[LIT_CLUSTER] = create_arps_map_and(mask, cpu_little_mask);
+	if (!maps[LIT_CLUSTER])
+		goto fail;
+	maps[BIG_CLUSTER] = create_arps_map_and(mask, cpu_big_mask);
+	if (!maps[BIG_CLUSTER])
+		goto fail;
+	maps[MID_CLUSTER] = create_arps_map_and(mask, cpu_mid_mask);
+	if (!maps[MID_CLUSTER])
+		goto fail;
+
+	return 0;
+fail:
+	MCPS_ERR("Fail init arps map\n");
+	return -ENOMEM;
+}
+
+// zero-weighted mask make arps_meta be NULL.
+struct arps_meta *create_arps_meta(cpumask_var_t *mask)
+{
+	struct arps_meta *meta = NULL;
 
 	meta = (struct arps_meta *)kzalloc(sizeof(struct arps_meta), GFP_KERNEL);
 	if (!meta) {
@@ -349,28 +376,20 @@ struct arps_meta *create_arps_meta(const char *buf)
 		return NULL;
 	}
 
-	if (create_arps_mask(buf, &meta->mask)) {
+	if (create_and_copy_arps_mask(&meta->mask, mask)) {
 		MCPS_DEBUG("Fail create_arps_mask\n");
 		goto fail;
 	}
 
 	if (!cpumask_weight(meta->mask)) {
-		MCPS_DEBUG(" : Fail cpumask_weight\n");
+		MCPS_DEBUG(" : Fail cpumask_weight 0\n");
 		goto fail;
 	}
 
-	ARPS_MAP(meta, ALL_CLUSTER) = create_arps_map(meta->mask);
-	if (!ARPS_MAP(meta, ALL_CLUSTER))
+	if (init_arps_map(meta->maps, meta->mask)) {
+		MCPS_DEBUG("Fail init_arps_map\n");
 		goto fail;
-	ARPS_MAP(meta, LIT_CLUSTER) = create_arps_map_and(meta->mask, cpu_little_mask);
-	if (!ARPS_MAP(meta, LIT_CLUSTER))
-		goto fail;
-	ARPS_MAP(meta, BIG_CLUSTER) = create_arps_map_and(meta->mask, cpu_big_mask);
-	if (!ARPS_MAP(meta, BIG_CLUSTER))
-		goto fail;
-	ARPS_MAP(meta, MID_CLUSTER) = create_arps_map_and(meta->mask, cpu_mid_mask);
-	if (!ARPS_MAP(meta, MID_CLUSTER))
-		goto fail;
+	}
 
 	init_rcu_head(&meta->rcu);
 
@@ -380,16 +399,14 @@ fail:
 	return NULL;
 }
 
-int update_arps_meta(const char *buf, int flag)
+void __update_arps_meta(cpumask_var_t *mask, int flag)
 {
 	struct arps_meta *arps, *old = arps = NULL;
 
-	int len = strlen(buf);
+	if (mask) {
+		arps = create_arps_meta(mask);
+	}
 
-	if (len == 0)
-		return 0;
-
-	arps = create_arps_meta(buf);
 	switch (flag) {
 	case MCPS_ARPS_META_STATIC:
 		spin_lock(&lock_arps_meta);
@@ -423,7 +440,24 @@ int update_arps_meta(const char *buf, int flag)
 		synchronize_rcu();
 		release_arps_meta(old);
 	}
+}
 
+int update_arps_meta(const char *val, int flag)
+{
+	cpumask_var_t mask;
+	int err = 0;
+	int len = strlen(val);
+
+	if (!len)
+		return 0;
+
+	err = create_arps_mask(val, &mask);
+	if (err) {
+		__update_arps_meta(NULL, flag);
+	} else {
+		__update_arps_meta(&mask, flag);
+		free_cpumask_var(mask);
+	}
 	return len;
 }
 
@@ -718,7 +752,8 @@ int set_mcps_move(const char *val, const struct kernel_param *kp)
 {
 	char *copy, *tmp, *sub;
 	int len = strlen(val);
-	int i, in[3] = {0,}; // from, to, option
+	int i;
+	unsigned int in[3] = {0,}; // from, to, option
 
 	if (len == 0) {
 		MCPS_DEBUG("%s - size 0\n", val);
@@ -726,24 +761,20 @@ int set_mcps_move(const char *val, const struct kernel_param *kp)
 	}
 
 	i = 0;
-	copy = (char *)kzalloc(sizeof(char) * len, GFP_KERNEL);
-	if (!copy) {
-		MCPS_DEBUG("set_mcps_move : fail to kzalloc\n");
+	tmp = copy = kstrdup(val, GFP_KERNEL);
+	if (!tmp) {
+		MCPS_DEBUG("kstrdup - fail\n");
 		goto end;
 	}
-	memcpy(copy, val, sizeof(char) * len);
-
-	tmp = copy;
 
 	while ((sub = strsep(&tmp, " ")) != NULL) {
-		int cpu, ret;
+		unsigned int cpu = 0;
 
 		if (i >= 3)
 			break;
 
-		ret = kstrtoint(sub, 0, &cpu);
-		if (ret) {
-			MCPS_DEBUG("kstrtoint fail\n");
+		if (kstrtouint(sub, 0, &cpu)) {
+			MCPS_DEBUG("kstrtouint fail\n");
 			goto fail;
 		}
 		in[i] = cpu;
@@ -754,7 +785,13 @@ int set_mcps_move(const char *val, const struct kernel_param *kp)
 		MCPS_DEBUG("params are not satisfied.\n");
 		goto fail;
 	}
-	MCPS_DEBUG("%d -> %d [%d]\n", in[0], in[1], in[2]);
+
+	if (!VALID_UCPU(in[0]) || !VALID_UCPU(in[1])) {
+		MCPS_DEBUG("fail to move : invalid cpu %u -> %u.\n", in[0], in[1]);
+		goto fail;
+	}
+
+	MCPS_DEBUG("%u -> %u [%u]\n", in[0], in[1], in[2]);
 
 	migrate_flow(in[0], in[1], in[2]);
 fail:
@@ -778,7 +815,7 @@ static int mcps_store_rps_map(struct netdev_rx_queue *queue, const char *buf, si
 	struct rps_map *old_map, *map;
 	cpumask_var_t mask;
 	int err, cpu, i;
-	static DEFINE_SPINLOCK(rps_map_lock);
+	static DEFINE_MUTEX(rps_map_mutex);
 
 	if (!alloc_cpumask_var(&mask, GFP_KERNEL)) {
 		MCPS_DEBUG("failed to alloc_cpumask\n");
@@ -817,9 +854,9 @@ static int mcps_store_rps_map(struct netdev_rx_queue *queue, const char *buf, si
 
 	MCPS_DEBUG("%*pb (%d)\n", cpumask_pr_args(mask), i);
 
-	spin_lock(&rps_map_lock);
+	mutex_lock(&rps_map_mutex);
 	old_map = rcu_dereference_protected(queue->rps_map,
-		lockdep_is_held(&rps_map_lock));
+		mutex_is_locked(&rps_map_mutex));
 	rcu_assign_pointer(queue->rps_map, map);
 
 	if (map)
@@ -827,7 +864,7 @@ static int mcps_store_rps_map(struct netdev_rx_queue *queue, const char *buf, si
 	if (old_map)
 		static_key_slow_dec(&rps_needed);
 
-	spin_unlock(&rps_map_lock);
+	mutex_unlock(&rps_map_mutex);
 
 	if (old_map)
 		kfree_rcu(old_map, rcu);
@@ -889,15 +926,12 @@ module_param_cb(mcps_rps_config,
 
 int set_mcps_arps_cpu(const char *val, const struct kernel_param *kp)
 {
-	// int len = __set_mcps_cpu(val, &mcps->arps_map);
 	size_t len = update_arps_meta(val, MCPS_ARPS_META_STATIC);
 	return len;
 }
 
 int get_mcps_arps_cpu(char *buffer, const struct kernel_param *kp)
 {
-	// size_t len = 0;
-	// len = __get_mcps_cpu(buffer, &mcps->arps_map);
 	size_t len = get_arps_meta(buffer, MCPS_ARPS_META_STATIC);
 	return len;
 }
@@ -938,7 +972,6 @@ module_param_cb(mcps_newflow_cpu,
 
 int set_mcps_dynamic_cpu(const char *val, const struct kernel_param *kp)
 {
-	// int len = __set_mcps_cpu(val, &mcps->dynamic_map);
 	size_t len = update_arps_meta(val, MCPS_ARPS_META_DYNAMIC);
 	return len;
 }
@@ -1388,7 +1421,7 @@ module_param_cb(mcps_mode,
 		&dummy_mcps_mode,
 		0640);
 
-static int create_and_init_arps_config(struct mcps_config *mcps)
+__visible_for_testing int create_and_init_arps_config(struct mcps_config *mcps)
 {
 	struct arps_config *config, *old_config;
 
@@ -1412,7 +1445,7 @@ static int create_and_init_arps_config(struct mcps_config *mcps)
 	return 1;
 }
 
-static int release_arps_config(struct mcps_config *mcps)
+__visible_for_testing int release_arps_config(struct mcps_config *mcps)
 {
 	struct arps_config *old_config;
 

@@ -768,6 +768,13 @@ config PROCESS_RECLAIM
 
 	 Any other value is ignored.
 
+config PROCESS_RECLAIM_IGNORE_ALL_TYPE
+	bool "ignore RECLAIM_ALL"
+	depends on PROCESS_RECLAIM
+	default n
+	help
+	  This is temporary workaround for app compactor.
+
 config INCREASE_MAXIMUM_SWAPPINESS
 	bool "Allow swappiness to be set up to 200"
 	depends on SWAP
@@ -795,6 +802,12 @@ config MMAP_READAROUND_LIMIT
 	  Inappropriate mmap readaround size can hurt device performance
 	  during the sluggish situation. Add the hard upper-limit for
 	  mmap readaround.
+
+config KSWAPD_PERFTUNE
+	bool "kswapd cpumask can be limited"
+	default y
+	help
+	  This provides sysctl node to set kswapd cpu affinity.
 
 config RBIN
 	bool "RBIN memory support"

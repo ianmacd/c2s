@@ -251,7 +251,10 @@ int dd_add_master_key(int userid, void *key, int len) {
 	struct dd_master_key *mk = NULL;
 	struct list_head *entry;
 
-	BUG_ON(len != sizeof(struct fscrypt_key));
+	if (len != sizeof(struct fscrypt_key)) {
+		dd_error("failed to add master key: len error");
+		return -EINVAL;
+	}
 
 	list_for_each(entry, &dd_master_key_head) {
 		struct dd_master_key *k = list_entry(entry, struct dd_master_key, list);
@@ -271,6 +274,12 @@ int dd_add_master_key(int userid, void *key, int len) {
 	mk->userid = userid;
 
 	memcpy(&mk->key, key, sizeof(struct fscrypt_key));
+	if (mk->key.size > FS_MAX_KEY_SIZE) {
+		//handle wrong size
+		dd_error("failed to add master key: size error");
+		kzfree(mk);
+		return -EINVAL;
+	}
 	spin_lock(&dd_master_key_lock);
 	list_add_tail(&mk->list, &dd_master_key_head);
 	spin_unlock(&dd_master_key_lock);
@@ -637,11 +646,11 @@ int dd_sec_crypt_bio_pages(struct dd_info *info, struct bio *orig,
 	return 0;
 }
 
-void dd_hex_key_dump(const char* tag, uint8_t *data, size_t data_len)
+void dd_hex_key_dump(const char* tag, uint8_t *data, unsigned int data_len)
 {
 	static const char *hex = "0123456789ABCDEF";
 	static const char delimiter = ' ';
-	int i;
+	unsigned int i;
 	char *buf;
 	size_t buf_len;
 

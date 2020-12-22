@@ -60,6 +60,9 @@ int cpboot_spi_load_cp_image(struct link_device *ld, struct io_device *iod, unsi
 		goto exit;
 	}
 
+	/* MUST not enable dma-mode on SPI
+	 * dma-mode does not support non-contiguous buffer
+	 */
 	buff = vzalloc(img.size);
 	if (!buff) {
 		mif_err("vzalloc(%u) error\n", img.size);

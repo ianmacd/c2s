@@ -2019,10 +2019,6 @@ free_interfaces:
 	}
 	usb_set_device_state(dev, USB_STATE_CONFIGURED);
 
-#ifdef CONFIG_USB_AUDIO_ENHANCED_DETECT_TIME
-	send_usb_audio_uevent(dev, 0, 1);
-#endif
-
 	if (cp->string == NULL &&
 			!(dev->quirks & USB_QUIRK_CONFIG_INTF_STRINGS))
 		cp->string = usb_cache_string(dev, cp->desc.iConfiguration);

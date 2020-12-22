@@ -372,6 +372,12 @@ int dsp_reloc_rule_list_import(struct dsp_reloc_rule_list *list,
 		return -1;
 	}
 
+	if (list->cnt > RULE_MAX) {
+		DL_ERROR("Rule list count(%d) is over RULE_MAX(%d)\n",
+				list->cnt, RULE_MAX);
+		return -1;
+	}
+
 	for (idx = 0; idx < list->cnt; idx++) {
 		list->list[idx] = (struct dsp_reloc_rule *)dsp_dl_malloc(
 				sizeof(*list->list[idx]),

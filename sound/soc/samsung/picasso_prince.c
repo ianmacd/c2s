@@ -27,6 +27,8 @@
 #include <linux/mfd/cs35l41/big_data.h>
 #include "bigdata_cirrus_sysfs_cb.h"
 
+#include <soc/samsung/exynos-cpupm.h>
+
 #define MADERA_BASECLK_48K	49152000
 #define MADERA_BASECLK_44K1	45158400
 
@@ -108,6 +110,8 @@ struct picasso_drvdata {
 
 	struct wake_lock wake_lock;
 	int wake_lock_switch;
+
+	int cpd_disable_state;
 };
 
 static struct picasso_drvdata picasso_prince_drvdata;
@@ -720,6 +724,8 @@ static int picasso_probe(struct snd_soc_card *card)
 	wake_lock_init(&drvdata->wake_lock, WAKE_LOCK_SUSPEND,
 				"picasso-sound");
 	drvdata->wake_lock_switch = 0;
+
+	drvdata->cpd_disable_state = 0;
 
 	return 0;
 }
@@ -1713,6 +1719,34 @@ static int set_sound_wakelock(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int cpd_disable_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct picasso_drvdata *drvdata = &picasso_prince_drvdata;
+
+	ucontrol->value.integer.value[0] = drvdata->cpd_disable_state;
+
+	return 0;
+}
+
+static int cpd_disable_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct picasso_drvdata *drvdata = &picasso_prince_drvdata;
+
+	drvdata->cpd_disable_state = ucontrol->value.integer.value[0];
+
+	dev_info(drvdata->dev, "%s: %d\n", __func__, drvdata->cpd_disable_state);
+
+	if (drvdata->cpd_disable_state) {
+		disable_power_mode(6, POWERMODE_TYPE_CLUSTER);
+	} else {
+		enable_power_mode(6, POWERMODE_TYPE_CLUSTER);
+	}
+
+	return 0;
+}
+
 static const char * const vts_output_texts[] = {
 	"None",
 	"DMIC1",
@@ -1734,6 +1768,10 @@ static const struct snd_kcontrol_new picasso_controls[] = {
 	SOC_DAPM_PIN_SWITCH("DMIC4"),
 	SOC_SINGLE_BOOL_EXT("Sound Wakelock",
 			0, get_sound_wakelock, set_sound_wakelock),
+	/* R8s WA: HW(cheongno.yun) requested
+	 * disable CPD during hadnset call */
+	SOC_SINGLE_EXT("CPD Disable", SND_SOC_NOPM, 0, 1, 0,
+			cpd_disable_get, cpd_disable_put),
 };
 
 static const struct snd_soc_dapm_widget picasso_widgets[] = {

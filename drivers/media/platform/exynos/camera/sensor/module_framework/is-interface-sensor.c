@@ -3954,7 +3954,7 @@ int set_sensor_info_mfhdr_mode_change(struct is_sensor_interface *itf,
 		sensor_uctl->longExposureTime = is_sensor_convert_us_to_ns(long_expo[idx]);
 		sensor_uctl->shortExposureTime = is_sensor_convert_us_to_ns(expo[idx]);
 
-		sensor_uctl->sensitivity = sensitivity[idx];//DIV_ROUND_UP((long_again[idx] + long_dgain[idx]), 10);
+		sensor_uctl->sensitivity = sensitivity ? sensitivity[idx] : 0;
 		sensor_uctl->analogGain = again[idx];
 		sensor_uctl->digitalGain = dgain[idx];
 		sensor_uctl->longAnalogGain = long_again[idx];

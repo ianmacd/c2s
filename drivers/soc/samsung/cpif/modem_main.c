@@ -847,15 +847,12 @@ ATTRIBUTE_GROUPS(clat);
 static ssize_t upstream_dev_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	char *upstream_dev_name = kmalloc(sizeof(char) * NETDEV_INTERFACE_NAME_LENGTH,
-					GFP_ATOMIC);
+	char upstream_dev_name[IFNAMSIZ];
 	ssize_t count = 0;
 
 	cpif_tethering_upstream_dev_get(upstream_dev_name);
 	count += sprintf(buf, "tethering upstream dev: %s\n", upstream_dev_name);
 	mif_info("-- tethering upstream dev: %s\n", upstream_dev_name);
-
-	kfree(upstream_dev_name);
 
 	return count;
 }
@@ -864,24 +861,18 @@ static ssize_t upstream_dev_store(struct kobject *kobj,
 		struct kobj_attribute *attr,
 		const char *buf, size_t count)
 {
-	char *upstream_dev_name_orig = kmalloc(sizeof(char) * NETDEV_INTERFACE_NAME_LENGTH,
-						GFP_ATOMIC);
-	char *upstream_dev_name_new = kmalloc(sizeof(char) * NETDEV_INTERFACE_NAME_LENGTH,
-						GFP_ATOMIC);
-	char *input = kmalloc(sizeof(char) * NETDEV_INTERFACE_NAME_LENGTH, GFP_ATOMIC);
+	char upstream_dev_name_orig[IFNAMSIZ];
+	char upstream_dev_name_new[IFNAMSIZ];
+	char input[IFNAMSIZ];
 
 	cpif_tethering_upstream_dev_get(upstream_dev_name_orig);
 	mif_info("-- original tethering upstream dev: %s\n", upstream_dev_name_orig);
 
-	strcpy(input, buf);
+	strlcpy(input, buf, IFNAMSIZ);
 	cpif_tethering_upstream_dev_set(input);
 
 	cpif_tethering_upstream_dev_get(upstream_dev_name_new);
 	mif_info("-- new tethering upstream dev: %s\n", upstream_dev_name_new);
-
-	kfree(upstream_dev_name_orig);
-	kfree(upstream_dev_name_new);
-	kfree(input);
 
 	return count;
 }

@@ -30,11 +30,11 @@
 typedef int (*GET_NEXT_LEVEL)(struct exynos_context *platform, int utilization);
 GET_NEXT_LEVEL gpu_dvfs_get_next_level;
 
-extern struct kbase_device *pkbdev;
-
 static int gpu_dvfs_governor_default(struct exynos_context *platform, int utilization);
 static int gpu_dvfs_governor_interactive(struct exynos_context *platform, int utilization);
+#ifdef CONFIG_MALI_TSG
 static int gpu_dvfs_governor_joint(struct exynos_context *platform, int utilization);
+#endif
 static int gpu_dvfs_governor_static(struct exynos_context *platform, int utilization);
 static int gpu_dvfs_governor_booster(struct exynos_context *platform, int utilization);
 static int gpu_dvfs_governor_dynamic(struct exynos_context *platform, int utilization);
@@ -52,12 +52,14 @@ static gpu_dvfs_governor_info governor_info[G3D_MAX_GOVERNOR_NUM] = {
 		gpu_dvfs_governor_interactive,
 		NULL
 	},
+#ifdef CONFIG_MALI_TSG
 	{
 		G3D_DVFS_GOVERNOR_JOINT,
 		"Joint",
 		gpu_dvfs_governor_joint,
 		NULL
 	},
+#endif /* CONFIG_MALI_TSG */
 	{
 		G3D_DVFS_GOVERNOR_STATIC,
 		"Static",
@@ -189,6 +191,9 @@ static int gpu_dvfs_governor_interactive(struct exynos_context *platform, int ut
 	return 0;
 }
 
+#ifdef CONFIG_MALI_TSG
+extern struct kbase_device *pkbdev;
+
 static int gpu_dvfs_governor_joint(struct exynos_context *platform, int utilization)
 {
 	int i;
@@ -309,7 +314,7 @@ int gpu_weight_prediction_utilisation(struct exynos_context *platform, int utili
 
 	return util_conv;
 }
-
+#endif /* CONFIG_MALI_TSG */
 #define G3D_GOVERNOR_STATIC_PERIOD		10
 static int gpu_dvfs_governor_static(struct exynos_context *platform, int utilization)
 {
@@ -442,6 +447,7 @@ int gpu_dvfs_decide_next_freq(struct kbase_device *kbdev, int utilization)
 	struct exynos_context *platform = (struct exynos_context *) kbdev->platform_context;
 	DVFS_ASSERT(platform);
 
+#ifdef CONFIG_MALI_TSG
 	if (platform->migov_mode == 1 && platform->is_gov_set != 1) {
 		gpu_dvfs_governor_setting_locked(platform, G3D_DVFS_GOVERNOR_JOINT);
 		platform->migov_saved_polling_speed = platform->polling_speed;
@@ -457,7 +463,7 @@ int gpu_dvfs_decide_next_freq(struct kbase_device *kbdev, int utilization)
 		gpu_tsg_reset_acc_count();	/* tsg acc count reset */
 	}
 	gpu_tsg_input_nr_acc_cnt();	/* acc input nr each dvfs period(30ms) */
-	
+#endif /* CONFIG_MALI_TSG */
 	spin_lock_irqsave(&platform->gpu_dvfs_spinlock, flags);
 	gpu_dvfs_decide_next_governor(platform);
 	gpu_dvfs_get_next_level(platform, utilization);
@@ -521,6 +527,7 @@ int gpu_dvfs_governor_setting(struct exynos_context *platform, int governor_type
 	return 0;
 }
 
+#ifdef CONFIG_MALI_TSG
 /* its function is to maintain clock & clock_lock */
 int gpu_dvfs_governor_setting_locked(struct exynos_context *platform, int governor_type)
 {
@@ -551,6 +558,7 @@ int gpu_dvfs_governor_setting_locked(struct exynos_context *platform, int govern
 
 	return 0;
 }
+#endif /* CONFIG_MALI_TSG */
 
 int gpu_dvfs_governor_init(struct kbase_device *kbdev)
 {
@@ -576,6 +584,7 @@ int gpu_dvfs_governor_init(struct kbase_device *kbdev)
 	return 0;
 }
 
+#ifdef CONFIG_MALI_TSG
 #define IS_GPU_ATOM(katom) (!((katom->core_req & BASE_JD_REQ_SOFT_JOB) ||  \
 			((katom->core_req & BASE_JD_REQ_ATOM_TYPE) ==    \
 			 BASE_JD_REQ_DEP)))
@@ -699,4 +708,5 @@ void gpu_tsg_reset_acc_count(void)
 	kbdev->queued_time_tick[0] = 0;
 	kbdev->queued_time_tick[1] = 0;
 }
+#endif /* CONFIG_MALI_TSG */
 #endif /* CONFIG_MALI_DVFS */

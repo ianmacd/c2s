@@ -18,6 +18,7 @@
 #include <linux/dma-buf.h>
 #include <linux/bitops.h>
 #include <linux/dma-fence.h>
+#include <linux/kthread.h>
 
 #define VB2_MAX_FRAME	(32)
 #define VB2_MAX_PLANES	(8)
@@ -275,7 +276,8 @@ struct vb2_buffer {
 
 	struct dma_fence	*in_fence;
 	struct dma_fence_cb	fence_cb;
-	struct work_struct	qbuf_work;
+	struct kthread_work	qbuf_work;
+	struct kthread_worker	*qbuf_workq;
 	spinlock_t              fence_cb_lock;
 
 	struct timer_list	fence_timer;

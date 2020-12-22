@@ -50,15 +50,15 @@
 #define EA8079_ID_LEN				(PANEL_ID_LEN)
 
 #define EA8079_CODE_REG			0xD1
-#define EA8079_CODE_OFS			55
-#define EA8079_CODE_LEN			(PANEL_CODE_LEN)
+#define EA8079_CODE_OFS			95
+#define EA8079_CODE_LEN			6
 
 #define EA8079_ELVSS_REG			0xB7
 #define EA8079_ELVSS_OFS			7
 #define EA8079_ELVSS_LEN			2
 
-#define EA8079_OCTA_ID_REG			0xA1
-#define EA8079_OCTA_ID_OFS			11
+#define EA8079_OCTA_ID_REG			0xEA
+#define EA8079_OCTA_ID_OFS			14
 #define EA8079_OCTA_ID_LEN			(PANEL_OCTA_ID_LEN)
 
 /* for brightness debugging */
@@ -111,6 +111,48 @@
 #define EA8079_SELF_MASK_CRC_OFS	6
 #define EA8079_SELF_MASK_CRC_LEN		4
 
+
+#define EA8079_GAMMA_MTP_1SET_LEN			43
+#define EA8079_GAMMA_MTP_SET_NUM			6
+
+#define EA8079_GAMMA_MTP_ALL_LEN		(EA8079_GAMMA_MTP_1SET_LEN * EA8079_GAMMA_MTP_SET_NUM)
+
+#define EA8079_GAMMA_MTP_120_READ_0_REG		0xB8
+#define EA8079_GAMMA_MTP_120_READ_0_OFS		0xE6
+#define EA8079_GAMMA_MTP_120_READ_0_LEN		1
+
+#define EA8079_GAMMA_MTP_120_READ_1_REG		0xB9
+#define EA8079_GAMMA_MTP_120_READ_1_OFS		0x0
+#define EA8079_GAMMA_MTP_120_READ_1_LEN		237
+
+#define EA8079_GAMMA_MTP_120_READ_2_REG		0xBA
+#define EA8079_GAMMA_MTP_120_READ_2_OFS		0x0
+#define EA8079_GAMMA_MTP_120_READ_2_LEN		20
+
+#define EA8079_GAMMA_MTP_60_READ_0_REG		0xB7
+#define EA8079_GAMMA_MTP_60_READ_0_OFS		0x81
+#define EA8079_GAMMA_MTP_60_READ_0_LEN		114
+
+#define EA8079_GAMMA_MTP_60_READ_1_REG		0xB8
+#define EA8079_GAMMA_MTP_60_READ_1_OFS		0x0
+#define EA8079_GAMMA_MTP_60_READ_1_LEN		144
+
+#define EA8079_GAMMA_MTP_0_REG		0xB7
+#define EA8079_GAMMA_MTP_0_OFS		0x81
+#define EA8079_GAMMA_MTP_0_LEN		114
+
+#define EA8079_GAMMA_MTP_1_REG		0xB8
+#define EA8079_GAMMA_MTP_1_OFS		0x0
+#define EA8079_GAMMA_MTP_1_LEN		145
+
+#define EA8079_GAMMA_MTP_2_REG		0xB9
+#define EA8079_GAMMA_MTP_2_OFS		0x0
+#define EA8079_GAMMA_MTP_2_LEN		237
+
+#define EA8079_GAMMA_MTP_3_REG		0xBA
+#define EA8079_GAMMA_MTP_3_OFS		0x0
+#define EA8079_GAMMA_MTP_3_LEN		20
+
 #ifdef CONFIG_SUPPORT_DDI_CMDLOG
 #define EA8079_CMDLOG_REG			0x9C
 #define EA8079_CMDLOG_OFS			0
@@ -128,9 +170,9 @@
 #define EA8079_MDNIE_1_OFS		(EA8079_MDNIE_0_OFS + EA8079_MDNIE_0_LEN)
 #define EA8079_MDNIE_1_LEN		(1)
 
-#define EA8079_MDNIE_2_REG		(0xB3)
+#define EA8079_MDNIE_2_REG		(0xB2)
 #define EA8079_MDNIE_2_OFS		(EA8079_MDNIE_1_OFS + EA8079_MDNIE_1_LEN)
-#define EA8079_MDNIE_2_LEN		(80)
+#define EA8079_MDNIE_2_LEN		(130)
 
 #define EA8079_MDNIE_3_REG		(0x87)
 #define EA8079_MDNIE_3_OFS		(EA8079_MDNIE_2_OFS + EA8079_MDNIE_2_LEN)
@@ -165,8 +207,8 @@
 
 
 #ifdef CONFIG_DYNAMIC_FREQ
-#define EA8079_MAX_MIPI_FREQ			4
-#define EA8079_DEFAULT_MIPI_FREQ		3
+#define EA8079_MAX_MIPI_FREQ			3
+#define EA8079_DEFAULT_MIPI_FREQ		0
 enum {
 	EA8079_OSC_DEFAULT,
 	MAX_EA8079_OSC,
@@ -192,6 +234,7 @@ enum {
 	ACL_ONOFF_MAPTBL,
 	ACL_FRAME_AVG_MAPTBL,
 	ACL_START_POINT_MAPTBL,
+	ACL_DIM_SPEED_MAPTBL,
 	ACL_OPR_MAPTBL,
 	IRC_MAPTBL,
 	IRC_MODE_MAPTBL,
@@ -215,6 +258,9 @@ enum {
 	SRC_AMP_MAPTBL,
 	MTP_MAPTBL,
 	FPS_MAPTBL,
+	FPS_PORCH_MAPTBL,
+	FPS_PORCH_SETTING_MAPTBL,
+	FPS_FREQ_MAPTBL,
 	LPM_NIT_MAPTBL,
 	LPM_MODE_MAPTBL,
 	LPM_DYN_VLIN_MAPTBL,
@@ -240,7 +286,8 @@ enum {
 	TDMB_TUNE_MAPTBL,
 #endif
 #ifdef CONFIG_DYNAMIC_FREQ
-	DYN_FFC_MAPTBL,
+	DYN_FFC_1_MAPTBL,
+	DYN_FFC_2_MAPTBL,
 #endif
 
 #ifdef CONFIG_SUPPORT_GRAYSPOT_TEST
@@ -255,6 +302,10 @@ enum {
 #if defined(CONFIG_SEC_FACTORY) && defined(CONFIG_SUPPORT_FAST_DISCHARGE)
 	FAST_DISCHARGE_MAPTBL,
 #endif
+	GAMMA_MTP_0_HS_MAPTBL,
+	GAMMA_MTP_1_HS_MAPTBL,
+	GAMMA_MTP_2_HS_MAPTBL,
+	GAMMA_MTP_3_HS_MAPTBL,
 	MAX_MAPTBL,
 };
 
@@ -287,6 +338,11 @@ enum {
 	READ_SELF_DIAG,
 	READ_SELF_MASK_CHECKSUM,
 	READ_SELF_MASK_CRC,
+	READ_GAMMA_MTP_120_0,
+	READ_GAMMA_MTP_120_1,
+	READ_GAMMA_MTP_120_2,
+	READ_GAMMA_MTP_60_0,
+	READ_GAMMA_MTP_60_1,
 #ifdef CONFIG_SUPPORT_POC_SPI
 	READ_POC_SPI_READ,
 	READ_POC_SPI_STATUS1,
@@ -307,6 +363,7 @@ enum {
 #ifdef CONFIG_SUPPORT_GRAYSPOT_TEST
 	READ_GRAYSPOT_CAL,
 #endif
+	MAX_READTBL,
 };
 
 enum {
@@ -335,6 +392,8 @@ enum {
 	RES_ERR_FG,
 	RES_DSI_ERR,
 	RES_SELF_DIAG,
+	RES_GAMMA_MTP_120,
+	RES_GAMMA_MTP_60,
 #ifdef CONFIG_SUPPORT_DDI_CMDLOG
 	RES_CMDLOG,
 #endif
@@ -355,6 +414,7 @@ enum {
 #endif
 	RES_SELF_MASK_CHECKSUM,
 	RES_SELF_MASK_CRC,
+	MAX_RESTBL
 };
 
 enum {
@@ -365,8 +425,9 @@ enum {
 
 
 enum {
-	EA8079_VRR_FPS_60,
 	EA8079_VRR_FPS_120,
+	EA8079_VRR_FPS_96,
+	EA8079_VRR_FPS_60,
 	MAX_EA8079_VRR_FPS,
 };
 
@@ -387,9 +448,11 @@ static u8 EA8079_ERR[EA8079_ERR_LEN];
 static u8 EA8079_ERR_FG[EA8079_ERR_FG_LEN];
 static u8 EA8079_DSI_ERR[EA8079_DSI_ERR_LEN];
 static u8 EA8079_SELF_DIAG[EA8079_SELF_DIAG_LEN];
+static u8 EA8079_GAMMA_MTP_120[EA8079_GAMMA_MTP_ALL_LEN];
+static u8 EA8079_GAMMA_MTP_60[EA8079_GAMMA_MTP_ALL_LEN];
 
 
-static struct rdinfo ea8079_rditbl[] = {
+static struct rdinfo ea8079_rditbl[MAX_READTBL] = {
 	[READ_ID] = RDINFO_INIT(id, DSI_PKT_TYPE_RD, EA8079_ID_REG, EA8079_ID_OFS, EA8079_ID_LEN),
 	[READ_COORDINATE] = RDINFO_INIT(coordinate, DSI_PKT_TYPE_RD, EA8079_COORDINATE_REG, EA8079_COORDINATE_OFS, EA8079_COORDINATE_LEN),
 	[READ_CODE] = RDINFO_INIT(code, DSI_PKT_TYPE_RD, EA8079_CODE_REG, EA8079_CODE_OFS, EA8079_CODE_LEN),
@@ -407,6 +470,16 @@ static struct rdinfo ea8079_rditbl[] = {
 	[READ_ERR_FG] = RDINFO_INIT(err_fg, DSI_PKT_TYPE_RD, EA8079_ERR_FG_REG, EA8079_ERR_FG_OFS, EA8079_ERR_FG_LEN),
 	[READ_DSI_ERR] = RDINFO_INIT(dsi_err, DSI_PKT_TYPE_RD, EA8079_DSI_ERR_REG, EA8079_DSI_ERR_OFS, EA8079_DSI_ERR_LEN),
 	[READ_SELF_DIAG] = RDINFO_INIT(self_diag, DSI_PKT_TYPE_RD, EA8079_SELF_DIAG_REG, EA8079_SELF_DIAG_OFS, EA8079_SELF_DIAG_LEN),
+	[READ_GAMMA_MTP_120_0] = RDINFO_INIT(gamma_mtp_120, DSI_PKT_TYPE_RD, EA8079_GAMMA_MTP_120_READ_0_REG,
+		EA8079_GAMMA_MTP_120_READ_0_OFS, EA8079_GAMMA_MTP_120_READ_0_LEN),
+	[READ_GAMMA_MTP_120_1] = RDINFO_INIT(gamma_mtp_120, DSI_PKT_TYPE_RD, EA8079_GAMMA_MTP_120_READ_1_REG,
+		EA8079_GAMMA_MTP_120_READ_1_OFS, EA8079_GAMMA_MTP_120_READ_1_LEN),
+	[READ_GAMMA_MTP_120_2] = RDINFO_INIT(gamma_mtp_120, DSI_PKT_TYPE_RD, EA8079_GAMMA_MTP_120_READ_2_REG,
+		EA8079_GAMMA_MTP_120_READ_2_OFS, EA8079_GAMMA_MTP_120_READ_2_LEN),
+	[READ_GAMMA_MTP_60_0] = RDINFO_INIT(gamma_mtp_60, DSI_PKT_TYPE_RD, EA8079_GAMMA_MTP_60_READ_0_REG,
+		EA8079_GAMMA_MTP_60_READ_0_OFS, EA8079_GAMMA_MTP_60_READ_0_LEN),
+	[READ_GAMMA_MTP_60_1] = RDINFO_INIT(gamma_mtp_60, DSI_PKT_TYPE_RD, EA8079_GAMMA_MTP_60_READ_1_REG,
+		EA8079_GAMMA_MTP_60_READ_1_OFS, EA8079_GAMMA_MTP_60_READ_1_LEN),
 };
 
 static DEFINE_RESUI(id, &ea8079_rditbl[READ_ID], 0);
@@ -428,7 +501,19 @@ static DEFINE_RESUI(dsi_err, &ea8079_rditbl[READ_DSI_ERR], 0);
 static DEFINE_RESUI(self_diag, &ea8079_rditbl[READ_SELF_DIAG], 0);
 
 
-static struct resinfo ea8079_restbl[] = {
+struct res_update_info RESUI(gamma_mtp_120)[] = {
+	RESUI_INIT(&ea8079_rditbl[READ_GAMMA_MTP_120_0], 0),
+	RESUI_INIT(&ea8079_rditbl[READ_GAMMA_MTP_120_1], EA8079_GAMMA_MTP_120_READ_0_LEN),
+	RESUI_INIT(&ea8079_rditbl[READ_GAMMA_MTP_120_2],
+			EA8079_GAMMA_MTP_120_READ_0_LEN + EA8079_GAMMA_MTP_120_READ_1_LEN),
+};
+
+struct res_update_info RESUI(gamma_mtp_60)[] = {
+	RESUI_INIT(&ea8079_rditbl[READ_GAMMA_MTP_60_0], 0),
+	RESUI_INIT(&ea8079_rditbl[READ_GAMMA_MTP_60_1], EA8079_GAMMA_MTP_60_READ_0_LEN),
+};
+
+static struct resinfo ea8079_restbl[MAX_RESTBL] = {
 	[RES_ID] = RESINFO_INIT(id, EA8079_ID, RESUI(id)),
 	[RES_COORDINATE] = RESINFO_INIT(coordinate, EA8079_COORDINATE, RESUI(coordinate)),
 	[RES_CODE] = RESINFO_INIT(code, EA8079_CODE, RESUI(code)),
@@ -445,6 +530,8 @@ static struct resinfo ea8079_restbl[] = {
 	[RES_ERR_FG] = RESINFO_INIT(err_fg, EA8079_ERR_FG, RESUI(err_fg)),
 	[RES_DSI_ERR] = RESINFO_INIT(dsi_err, EA8079_DSI_ERR, RESUI(dsi_err)),
 	[RES_SELF_DIAG] = RESINFO_INIT(self_diag, EA8079_SELF_DIAG, RESUI(self_diag)),
+	[RES_GAMMA_MTP_120] = RESINFO_INIT(gamma_mtp_120, EA8079_GAMMA_MTP_120, RESUI(gamma_mtp_120)),
+	[RES_GAMMA_MTP_60] = RESINFO_INIT(gamma_mtp_60, EA8079_GAMMA_MTP_60, RESUI(gamma_mtp_60)),
 };
 
 enum {
@@ -493,6 +580,7 @@ enum {
 
 enum {
 	EA8079_VRR_120HS,
+	EA8079_VRR_96HS,
 	EA8079_VRR_60HS,
 	MAX_EA8079_VRR,
 };
@@ -503,6 +591,7 @@ enum {
 
 enum {
 	EA8079_DISPLAY_MODE_1080x2400_120HS,
+	EA8079_DISPLAY_MODE_1080x2400_96HS,
 	EA8079_DISPLAY_MODE_1080x2400_60HS,
 	MAX_EA8079_DISPLAY_MODE,
 };
@@ -515,9 +604,22 @@ enum {
 	MAX_EA8079_VRR_KEY,
 };
 
-static u32 EA8079_VRR_FPS[MAX_EA8079_VRR][MAX_EA8079_VRR_KEY] = {
-	[EA8079_VRR_60HS] = { 60, VRR_HS_MODE, 0, 0 },
-	[EA8079_VRR_120HS] = { 120, VRR_HS_MODE, 0, 0 },
+enum {
+	EA8079_GAMMA_MTP_0,
+	EA8079_GAMMA_MTP_1,
+	EA8079_GAMMA_MTP_2,
+	EA8079_GAMMA_MTP_3,
+	EA8079_GAMMA_MTP_4,
+	EA8079_GAMMA_MTP_5,
+	MAX_EA8079_GAMMA_MTP,
+};
+
+enum {
+	EA8079_GAMMA_BR_INDEX_0,
+	EA8079_GAMMA_BR_INDEX_1,
+	EA8079_GAMMA_BR_INDEX_2,
+	EA8079_GAMMA_BR_INDEX_3,
+	MAX_EA8079_GAMMA_BR_INDEX,
 };
 
 static int init_common_table(struct maptbl *tbl);
@@ -529,6 +631,9 @@ static int getidx_gamma_mode2_brt_table(struct maptbl *tbl);
 static int getidx_gm2_elvss_table(struct maptbl *tbl);
 static int getidx_hbm_transition_table(struct maptbl *tbl);
 static int getidx_acl_opr_table(struct maptbl *tbl);
+static int getidx_hbm_onoff_table(struct maptbl *);
+static int getidx_acl_onoff_table(struct maptbl *);
+static int getidx_acl_dim_onoff_table(struct maptbl *tbl);
 
 static int init_lpm_brt_table(struct maptbl *tbl);
 static int getidx_lpm_brt_table(struct maptbl *tbl);
@@ -537,7 +642,6 @@ static int getidx_lpm_brt_table(struct maptbl *tbl);
 static void copy_dummy_maptbl(struct maptbl *tbl, u8 *dst);
 #endif
 static void copy_common_maptbl(struct maptbl *tbl, u8 *dst);
-static void copy_elvss_otp_maptbl(struct maptbl *, u8 *);
 static void copy_tset_maptbl(struct maptbl *tbl, u8 *dst);
 #ifdef CONFIG_SUPPORT_XTALK_MODE
 static int getidx_vgh_table(struct maptbl *tbl);
@@ -546,12 +650,15 @@ static int getidx_vgh_table(struct maptbl *tbl);
 static int getidx_fast_discharge_table(struct maptbl *tbl);
 #endif
 static int getidx_vrr_fps_table(struct maptbl *);
+#if defined(__PANEL_NOT_USED_VARIABLE__)
+static int getidx_vrr_gamma_table(struct maptbl *);
+#endif
+static int getidx_lpm_mode_table(struct maptbl *);
+static bool ea8079_is_120hz(struct panel_device *panel);
+
 #ifdef CONFIG_EXYNOS_DECON_MDNIE_LITE
 static int init_color_blind_table(struct maptbl *tbl);
 static int getidx_mdnie_scenario_maptbl(struct maptbl *tbl);
-#ifdef CONFIG_SUPPORT_HMD
-static int getidx_mdnie_hmd_maptbl(struct maptbl *tbl);
-#endif
 static int getidx_mdnie_hdr_maptbl(struct maptbl *tbl);
 static int init_mdnie_night_mode_table(struct maptbl *tbl);
 static int getidx_mdnie_night_mode_maptbl(struct maptbl *tbl);
@@ -571,10 +678,15 @@ static int getidx_mdnie_3_maptbl(struct pkt_update_info *pktui);
 static int getidx_mdnie_4_maptbl(struct pkt_update_info *pktui);
 static int getidx_mdnie_5_maptbl(struct pkt_update_info *pktui);
 
+#if defined(__PANEL_NOT_USED_VARIABLE__)
+static int init_gamma_mtp_all_table(struct maptbl *tbl);
+#endif
+
 static int getidx_mdnie_scr_white_maptbl(struct pkt_update_info *pktui);
 static void update_current_scr_white(struct maptbl *tbl, u8 *dst);
 #endif /* CONFIG_EXYNOS_DECON_MDNIE_LITE */
 #ifdef CONFIG_DYNAMIC_FREQ
 static int getidx_dyn_ffc_table(struct maptbl *tbl);
 #endif
+static bool is_panel_state_not_lpm(struct panel_device *panel);
 #endif /* __EA8079_H__ */

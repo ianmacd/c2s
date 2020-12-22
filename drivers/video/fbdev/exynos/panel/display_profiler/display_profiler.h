@@ -183,7 +183,7 @@ enum {
 /* pkt_type[15:0] Reserved */
 
 
-#define PROFILER_CMDLOG_FILTER_SIZE 255
+#define PROFILER_CMDLOG_FILTER_SIZE (0xFF + 1)
 
 struct profiler_config {
 	int profiler_en;

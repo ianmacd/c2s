@@ -22,7 +22,7 @@
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 #include "usb.h"
-#if defined(CONFIG_USB_HOST_CERTI)
+#if defined(CONFIG_USB_HOST_CERTI) || defined(CONFIG_USB_NOTIFY_PROC_LOG)
 #include <linux/usb_notify.h>
 #endif
 
@@ -208,6 +208,9 @@ static void generic_disconnect(struct usb_device *udev)
 static int generic_suspend(struct usb_device *udev, pm_message_t msg)
 {
 	int rc;
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
+	int event;
+#endif
 
 	/* Normal USB devices suspend through their upstream port.
 	 * Root hubs don't have upstream ports to suspend,
@@ -227,6 +230,13 @@ static int generic_suspend(struct usb_device *udev, pm_message_t msg)
 		rc = 0;
 	else
 		rc = usb_port_suspend(udev, msg);
+
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
+	if (!udev->parent && rc) {
+		event = NOTIFY_EXTRA_ROOTHUB_SUSPEND_FAIL;
+		store_usblog_notify(NOTIFY_EXTRA, (void *)&event, NULL);
+	}
+#endif
 
 	return rc;
 }

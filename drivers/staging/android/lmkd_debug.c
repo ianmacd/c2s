@@ -14,6 +14,11 @@
 #include <linux/file.h>
 #include <linux/uaccess.h>
 
+#ifdef CONFIG_PSI
+#include <linux/cgroup.h>
+#include <linux/psi.h>
+#endif
+
 #define RET_OK   0
 #define RET_ERR  1
 
@@ -21,13 +26,33 @@ static int lmkd_count;
 static int lmkd_cricount;
 
 static atomic_t lmkd_debug_init_suc;
-static struct proc_dir_entry *lmkd_debug_rootdir = NULL;
+static struct proc_dir_entry *lmkd_debug_rootdir;
+
+#ifdef CONFIG_PSI
+extern u64 psi_full_max;
+#endif
+
+static ssize_t psi_full_max_read(struct file *file, char __user *buf,
+			    size_t count, loff_t *ppos)
+{
+	size_t len;
+	char buffer[32];
+
+	#ifdef CONFIG_PSI
+	len = snprintf(buffer, sizeof(buffer), "%llu\n", psi_full_max);
+	psi_full_max = 0;
+	#else
+	len = snprintf(buffer, sizeof(buffer), "%llu\n", 0);
+	#endif
+	return simple_read_from_buffer(buf, count, ppos, buffer, len);
+}
 
 static ssize_t psi_lmkd_count_read(struct file *file, char __user *buf,
 			    size_t count, loff_t *ppos)
 {
 	size_t len;
 	char buffer[32];
+
 	len = snprintf(buffer, sizeof(buffer), "%d\n", lmkd_count);
 
 	return simple_read_from_buffer(buf, count, ppos, buffer, len);
@@ -38,6 +63,7 @@ static ssize_t psi_lmkd_cricount_read(struct file *file, char __user *buf,
 {
 	size_t len;
 	char buffer[32];
+
 	len = snprintf(buffer, sizeof(buffer), "%d\n", lmkd_cricount);
 
 	return simple_read_from_buffer(buf, count, ppos, buffer, len);
@@ -48,6 +74,7 @@ static ssize_t psi_lmkd_count_write(struct file *file, const char __user *user_b
 {
 	char buffer[32];
 	int err;
+
 	memset(buffer, 0, sizeof(buffer));
 
 	if (count > sizeof(buffer) - 1)
@@ -57,8 +84,9 @@ static ssize_t psi_lmkd_count_write(struct file *file, const char __user *user_b
 		return err;
 	}
 
+	buffer[count] = '\0';
 	err = kstrtoint(strstrip(buffer), 0, &lmkd_count);
-	if(err)
+	if (err)
 		return err;
 
 	return count;
@@ -69,6 +97,7 @@ static ssize_t psi_lmkd_cricount_write(struct file *file, const char __user *use
 {
 	char buffer[32];
 	int err;
+
 	memset(buffer, 0, sizeof(buffer));
 
 	if (count > sizeof(buffer) - 1)
@@ -78,13 +107,19 @@ static ssize_t psi_lmkd_cricount_write(struct file *file, const char __user *use
 		return err;
 	}
 
+	buffer[count] = '\0';
 	err = kstrtoint(strstrip(buffer), 0, &lmkd_cricount);
-	if(err)
+	if (err)
 		return err;
 
 	return count;
 }
 
+static const struct file_operations psi_full_max_fops = {
+	.read           = psi_full_max_read,
+//	.write          = psi_full_max_write,
+	.llseek         = default_llseek,
+};
 static const struct file_operations psi_lmkd_count_fops = {
 	.read           = psi_lmkd_count_read,
 	.write          = psi_lmkd_count_write,
@@ -101,6 +136,7 @@ static int __init klmkd_debug_init(void)
 {
 	struct proc_dir_entry *lmkd_count_entry = NULL;
 	struct proc_dir_entry *lmkd_cricount_entry = NULL;
+	struct proc_dir_entry *psi_full_max_entry = NULL;
 
 	lmkd_debug_rootdir = proc_mkdir("lmkd_debug", NULL);
 	if (!lmkd_debug_rootdir)
@@ -112,12 +148,21 @@ static int __init klmkd_debug_init(void)
 			remove_proc_entry("lmkd_debug", NULL);
 			lmkd_debug_rootdir = NULL;
 		} else {
-			lmkd_cricount_entry = proc_create("lmkd_cricount", 0, lmkd_debug_rootdir, &psi_lmkd_cricount_fops);
+			lmkd_cricount_entry = proc_create("lmkd_cricount", 0644, lmkd_debug_rootdir, &psi_lmkd_cricount_fops);
 			if (!lmkd_cricount_entry) {
 				pr_err("create /proc/lmkd_debug/lmkd_cricount failed, remove /proc/lmkd_debug	dir\n");
 				remove_proc_entry("lmkd_debug/lmkd_count", NULL);
 				remove_proc_entry("lmkd_debug", NULL);
 				lmkd_debug_rootdir = NULL;
+			} else {
+				psi_full_max_entry = proc_create("psi_full_max", 0644, lmkd_debug_rootdir, &psi_full_max_fops);
+				if (!psi_full_max_entry) {
+					pr_err("create /proc/lmkd_debug/psi_full_max failed, remove /proc/lmkd_debug	dir\n");
+					remove_proc_entry("lmkd_debug/lmkd_count", NULL);
+					remove_proc_entry("lmkd_debug/lmkd_cricount", NULL);
+					remove_proc_entry("lmkd_debug", NULL);
+					lmkd_debug_rootdir = NULL;
+				}
 			}
 		}
 	}
@@ -131,6 +176,7 @@ static void __exit klmkd_debug_exit(void)
 	if (lmkd_debug_rootdir) {
 		remove_proc_entry("lmkd_count", lmkd_debug_rootdir);
 		remove_proc_entry("lmkd_cricount", lmkd_debug_rootdir);
+		remove_proc_entry("psi_full_max", lmkd_debug_rootdir);
 		remove_proc_entry("lmkd_debug", NULL);
 	}
 }

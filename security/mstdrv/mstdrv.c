@@ -212,6 +212,10 @@ static int mfc_get_property(union power_supply_propval *val) {
         u8 mst_mode, reg_data;
 
         psy = get_power_supply_by_name("mfc-charger");
+	if (psy == NULL) {
+		pr_err("%s cannot get power supply!\n", __func__);
+		return -1;
+	}
         charger = power_supply_get_drvdata(psy);
         if (charger == NULL) {
                 pr_err("%s cannot get charger drvdata!\n", __func__);
@@ -583,8 +587,14 @@ static int transmit_mst_data(int track)
 	mst_req_t *kreq = NULL;
 	mst_rsp_t *krsp = NULL;
 	int req_len = 0, rsp_len = 0;
+	// Core Affinity
+	struct cpumask cpumask;
+	uint32_t cpu;
 
-	mutex_lock(&mst_mutex);
+	if (!mutex_trylock(&transmit_mutex)) {
+		printk("[MST] failed to acquire transmit_mutex!\n");
+		return ERROR_VALUE;
+	}
 	snprintf(app_name, MAX_APP_NAME_SIZE, "%s", MST_TA);
 	if (NULL == qhandle) {
 		/* start the mst tzapp only when it is not loaded. */
@@ -619,6 +629,22 @@ static int transmit_mst_data(int track)
 	krsp = (struct mst_rsp_s *)(qhandle->sbuf + req_len);
 	rsp_len = sizeof(mst_rsp_t);
 
+	// Core Affinity
+	printk("[MST] sched_setaffinity not to run on core0");
+	if (num_online_cpus() < 2) {
+		cpumask_setall(&cpumask);
+		for_each_cpu(cpu, &cpumask) {
+		if (cpu == 0)
+			continue;
+		cpu_up(cpu);
+		break;
+		}
+	}
+	cpumask_clear(&cpumask);
+	cpumask_copy(&cpumask, cpu_online_mask);
+	cpumask_clear_cpu(0, &cpumask);
+	sched_setaffinity(0, &cpumask);
+
 	mst_info("%s: cmd_id = %x, req_len = %d, rsp_len = %d\n", __func__,
 		 kreq->cmd_id, req_len, rsp_len);
 
@@ -650,7 +676,7 @@ static int transmit_mst_data(int track)
 		qhandle = NULL;
 	}
 exit:
-	mutex_unlock(&mst_mutex);
+        mutex_unlock(&transmit_mutex);
 	return ret;
 }
 #endif

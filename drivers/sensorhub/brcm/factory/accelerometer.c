@@ -172,7 +172,7 @@ int accel_do_calibrate(struct ssp_data *data, int iEnable, const int max_accel_1
 			iSum[0] += data->buf[ACCELEROMETER_SENSOR].x;
 			iSum[1] += data->buf[ACCELEROMETER_SENSOR].y;
 			iSum[2] += data->buf[ACCELEROMETER_SENSOR].z;
-			mdelay(10);
+			msleep(10);
 		}
 		disable_accel_for_cal(data, iRet);
 

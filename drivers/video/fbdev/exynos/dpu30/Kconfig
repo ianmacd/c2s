@@ -170,7 +170,7 @@ config EXYNOS_SUPPORT_READBACK
 	bool "Support readback buffer"
 		depends on EXYNOS_DPU30
 		default n
-		
+
 config EXYNOS_SET_ACTIVE
 	bool "Support Set active control for mres/vrr"
 	depends on EXYNOS_DPU30
@@ -214,6 +214,11 @@ config DISPLAYPORT_ENG
 	default n
 	help
 	  For DISPLAYPORT eng binary.
+
+config EXYNOS_DOZE_FIRST_FRAME_BLACK
+	bool "Support DOZE first black frame"
+        depends on EXYNOS_DPU30
+        default n
 
 source "drivers/video/fbdev/exynos/dpu30/panels/Kconfig"
 source "drivers/video/fbdev/exynos/dpu30/mcd_hdr/Kconfig"

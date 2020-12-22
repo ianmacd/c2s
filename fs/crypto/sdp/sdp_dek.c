@@ -61,11 +61,11 @@ inline struct sdp_info *fscrypt_sdp_alloc_sdp_info(void)
 	return ci_sdp_info;
 }
 
-void dump_file_key_hex(const char* tag, uint8_t *data, size_t data_len)
+void dump_file_key_hex(const char* tag, uint8_t *data, unsigned int data_len)
 {
 	static const char *hex = "0123456789ABCDEF";
 	static const char delimiter = ' ';
-	int i;
+	unsigned int i;
 	char *buf;
 	size_t buf_len;
 

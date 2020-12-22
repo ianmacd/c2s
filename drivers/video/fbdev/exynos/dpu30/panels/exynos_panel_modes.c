@@ -121,7 +121,7 @@ exynos_display_modes_create_from_panel_display_modes(struct exynos_panel_device 
 		struct panel_display_modes *panel_modes)
 {
 	struct exynos_display_modes *exynos_modes;
-	struct exynos_display_mode *native_mode;
+	struct exynos_display_mode *native_mode = NULL;
 	int i, j;
 
 	exynos_modes = kzalloc(sizeof(*exynos_modes), GFP_KERNEL);
@@ -186,12 +186,19 @@ exynos_display_modes_create_from_panel_display_modes(struct exynos_panel_device 
 			sizeof(struct exynos_display_mode *),
 			compare_exynos_display_mode, NULL);
 
+	/*
+	 * print sorted exynos_display_mode list
+	 */
+	for (i = 0; i < exynos_modes->num_modes; i++)
+		exynos_mode_debug_printmodeline(exynos_modes->modes[i]);
+
 	/* find default mode in sorted exynos_display_mode */
 	for (i = 0; native_mode && i < exynos_modes->num_modes; i++) {
 		if (!memcmp(native_mode, exynos_modes->modes[i],
-					sizeof(struct exynos_display_mode)))
+					sizeof(struct exynos_display_mode))) {
 			exynos_modes->native_mode = i;
-		exynos_mode_debug_printmodeline(exynos_modes->modes[i]);
+			break;
+		}
 	}
 
 	return exynos_modes;

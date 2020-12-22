@@ -41,6 +41,7 @@ static DEFINE_PANEL_UDELAY(s6e3hab_aod_self_spsram_sel_delay, 1);
 static DEFINE_PANEL_UDELAY(s6e3hab_aod_self_mask_checksum_1frame_delay, 16700);
 static DEFINE_PANEL_UDELAY(s6e3hab_aod_self_mask_checksum_2frame_delay, 33400);
 static DEFINE_PANEL_UDELAY(s6e3hab_aod_time_update_delay, 33400);
+static DEFINE_PANEL_MDELAY(s6e3hab_aod_self_spsram_reset_delay, 1);
 
 
 static DEFINE_PANEL_KEY(s6e3hab_aod_l1_key_enable, CMD_LEVEL_1,
@@ -481,7 +482,7 @@ static char S6E3HAB_AOD_ANALOG_MASK[] = {
 	0x77,
 	0x00,
 	0x50, 0x13, 0x50, 0x13, 0x50, 0x13,
-	0x0F, 0x07, 0x85, 0x1F, 0x0F, 0x07, 0xA6, 0x20, 0x01, 0x00, 0xB2, 0x28, /*s6e3hab_aod_analog_mask*/
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /*s6e3hab_aod_analog_mask*/
 };
 static DEFINE_STATIC_PACKET(s6e3hab_aod_analog_mask, DSI_PKT_TYPE_WR, S6E3HAB_AOD_ANALOG_MASK, 7);
 

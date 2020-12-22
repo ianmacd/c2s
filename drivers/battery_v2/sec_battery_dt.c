@@ -713,8 +713,10 @@ int sec_bat_parse_dt(struct device *dev,
 				pdata->wpc_input_limit_current;
 		}
 
-        battery->wpc_vout_ctrl_lcd_on = of_property_read_bool(np,
-				     "battery,wpc_vout_ctrl_lcd_on");
+                battery->wpc_vout_ctrl_lcd_on = of_property_read_bool(np,
+							"battery,wpc_vout_ctrl_lcd_on");
+		battery->support_unknown_wpcthm = of_property_read_bool(np,
+							"battery,support_unknown_wpcthm");
 	}
 
 	ret = of_property_read_u32(np, "battery,wc_full_input_limit_current",
@@ -1065,6 +1067,25 @@ int sec_bat_parse_dt(struct device *dev,
 				pdata->wpc_input_limit_current;
 		}
 	}	
+
+	ret = of_property_read_u32(np, "battery,non_wc20_wpc_charging_limit",
+				   &pdata->non_wc20_wpc_charging_limit);
+
+	if (pdata->non_wc20_wpc_charging_limit) {
+		ret = of_property_read_u32(np, "battery,non_wc20_wpc_high_temp",
+				&pdata->non_wc20_wpc_high_temp);
+		if (ret)
+			pr_info("%s : non_wc20_wpc_high_temp is Empty\n", __func__);
+
+		ret = of_property_read_u32(np, "battery,non_wc20_wpc_high_temp_recovery",
+				&pdata->non_wc20_wpc_high_temp_recovery);
+		if (ret)
+			pr_info("%s : non_wc20_wpc_high_temp_recovery is Empty\n", __func__);
+	} else {
+		pr_info("%s : non_wc20_wpc_charging_limit is Empty\n", __func__);
+		pdata->non_wc20_wpc_high_temp = pdata->wpc_high_temp;
+		pdata->non_wc20_wpc_high_temp_recovery = pdata->wpc_high_temp_recovery;
+	}
 
 	ret = of_property_read_u32(np, "battery,full_check_type",
 		&pdata->full_check_type);

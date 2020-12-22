@@ -180,6 +180,8 @@ __setup("psi=", setup_psi);
 static int lmkd_count;
 static int lmkd_cricount;
 
+u64 psi_full_max;
+
 /* Sampling frequency in nanoseconds */
 static u64 psi_period __read_mostly;
 
@@ -561,6 +563,15 @@ static u64 update_triggers(struct psi_group *group, u64 now)
 
 		/* Calculate growth since last update */
 		growth = window_update(&t->win, now, total[t->state]);
+
+		if ((t->win.size >= MONITOR_WINDOW_MIN_NS)){
+			if (t->state==3) { //FULL
+				if(growth < 5000000000 && growth > psi_full_max) {
+					psi_full_max = growth;
+				}
+			}
+		}
+
 		if (growth < t->threshold)
 			continue;
 
@@ -1077,6 +1088,7 @@ static ssize_t psi_lmkd_count_write(struct file *file, const char __user *user_b
 		return err;
 	}
 
+	buffer[count] = '\0';
 	err = kstrtoint(strstrip(buffer), 0, &lmkd_count);
 	if(err)
 		return err;
@@ -1098,6 +1110,7 @@ static ssize_t psi_lmkd_cricount_write(struct file *file, const char __user *use
 		return err;
 	}
 
+	buffer[count] = '\0';
 	err = kstrtoint(strstrip(buffer), 0, &lmkd_cricount);
 	if(err)
 		return err;

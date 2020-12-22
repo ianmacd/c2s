@@ -109,6 +109,11 @@ static int calc_vfp(struct panel_vrr *vrr, int fps)
 	if (!vrr)
 		return -EINVAL;
 
+	if (fps == 0) {
+		panel_warn("fps is zero!!\n");
+		return -EINVAL;
+	}
+
 	base_fps = vrr->base_fps;
 	base_vbp = vrr->base_vbp;
 	base_vfp = vrr->base_vfp;
@@ -871,7 +876,8 @@ static int getidx_dimming_vrr_maptbl(struct maptbl *tbl)
 	if (layer < 0) {
 		panel_err("vrr(%d%s) not found\n",
 				get_panel_refresh_rate(panel),
-				get_panel_refresh_mode(panel));
+				get_panel_refresh_mode(panel) ==
+				VRR_HS_MODE ? "HS" : "NM");
 		layer = 0;
 	}
 
@@ -1314,7 +1320,7 @@ static int generate_interpolation_vrr_gamma(struct panel_info *panel_data,
 					S6E3HAB_VRR_DIM[upper_vrr_idx].fps);
 #endif
 			gamma_table_interpolation_round(out_gamma_tbl[0], out_gamma_tbl[1], out_vrr_gamma_tbl, nr_tp,
-					abs(fps - S6E3HAB_VRR_DIM[lower_vrr_idx].base_fps),
+					abs(fps - S6E3HAB_VRR_DIM[lower_vrr_idx].fps),
 					abs(S6E3HAB_VRR_DIM[upper_vrr_idx].fps - S6E3HAB_VRR_DIM[lower_vrr_idx].fps));
 		}
 	} else if (luminance <= scaleup_hbm_target_lum) {
@@ -1335,7 +1341,7 @@ static int generate_interpolation_vrr_gamma(struct panel_info *panel_data,
 			memcpy(out_vrr_gamma_tbl, out_gamma_tbl[0], sizeof(s32) * nr_tp * MAX_COLOR);
 		else
 			gamma_table_interpolation_round(out_gamma_tbl[0], out_gamma_tbl[1], out_vrr_gamma_tbl, nr_tp,
-					abs(fps - S6E3HAB_VRR_DIM[lower_vrr_idx].base_fps),
+					abs(fps - S6E3HAB_VRR_DIM[lower_vrr_idx].fps),
 					abs(S6E3HAB_VRR_DIM[upper_vrr_idx].fps - S6E3HAB_VRR_DIM[lower_vrr_idx].fps));
 	} else {
 		/* UI MAX BRIGHTNESS ~ EXTENDED HBM MAX BRIGHTNESS */
@@ -1567,8 +1573,10 @@ static void copy_gamma_maptbl(struct maptbl *tbl, u8 *dst)
 				panel_info("60nm: %s\n", buf);
 #endif
 				for (i = 0; i < nr_tp * MAX_COLOR; i++)
-					out_gamma_tbl[0][i] = (out_gamma_tbl[0][i] * out_gamma_tbl[1][i]
-							+ out_gamma_tbl[2][i] / 2) / out_gamma_tbl[2][i];
+					out_gamma_tbl[0][i] =
+						(out_gamma_tbl[2][i] == 0) ? 0 :
+						(out_gamma_tbl[0][i] * out_gamma_tbl[1][i]
+						 + out_gamma_tbl[2][i] / 2) / out_gamma_tbl[2][i];
 #ifdef VRR_BRIDGE_GAMMA_DEBUG
 				p = buf;
 				for (i = 0; i < nr_tp * MAX_COLOR; i++)
@@ -1762,6 +1770,10 @@ static void copy_aor_maptbl(struct maptbl *tbl, u8 *dst)
 
 			vtotal = vrr->base_vbp + vrr->base_vactive + vfp;
 			base_vtotal = vrr->base_vbp + vrr->base_vactive + vrr->base_vfp;
+			if (base_vtotal == 0) {
+				panel_warn("base_vtotal is zero!!\n");
+				return;
+			}
 			aor = ((aor * vtotal) / base_vtotal) + aor_offset;
 			panel_dbg("aor interpolation(aor:%d aor_offset:%d fps:%d vfp:%d vtotal:%d)\n",
 					aor, aor_offset, vrr_fps, vfp, vtotal);
@@ -1782,6 +1794,10 @@ static void copy_aor_maptbl(struct maptbl *tbl, u8 *dst)
 			}
 			vtotal = vrr->base_vbp + vrr->base_vactive + vfp;
 			base_vtotal = vrr->base_vbp + vrr->base_vactive + vrr->base_vfp;
+			if (base_vtotal == 0) {
+				panel_warn("base_vtotal is zero!!\n");
+				return;
+			}
 			aor = (aor * vtotal) / base_vtotal;
 			panel_dbg("aor interpolation(aor:%d fps:%d vfp:%d vtotal:%d)\n",
 					aor, vrr_fps, vfp, vtotal);
@@ -3737,3 +3753,44 @@ static void show_self_mask_crc(struct dumpinfo *info)
 			crc[0], crc[1], crc[2], crc[3]);
 	panel_info("====================================================\n");
 }
+
+static bool is_panel_state_not_lpm(struct panel_device *panel)
+{
+	if (panel->state.cur_state != PANEL_STATE_ALPM)
+		return true;
+
+	return false;
+}
+
+#ifdef CONFIG_PANEL_VRR_BRIDGE
+#define S6E3HAB_HUBBLE_ARR_MIN_LUMINANCE (11)
+#define S6E3HAB_HUBBLE_ARR_MAX_LUMINANCE (S6E3HAB_HUBBLE_TARGET_LUMINANCE)
+#define S6E3HAB_HUBBLE_BRR_MIN_LUMINANCE (98)
+#define S6E3HAB_HUBBLE_BRR_MAX_LUMINANCE (S6E3HAB_HUBBLE_TARGET_LUMINANCE)
+static bool s6e3hab_hubble_bridge_refresh_rate_changeable(struct panel_device *panel)
+{
+	struct panel_bl_device *panel_bl;
+	int nit, vrr_fps, vrr_mode;
+	bool changeable = false;
+
+	if (panel == NULL) {
+		panel_err("panel is null\n");
+		return false;
+	}
+
+	panel_bl = &panel->panel_bl;
+	vrr_fps = get_panel_refresh_rate(panel);
+	vrr_mode = get_panel_refresh_mode(panel);
+	nit = get_actual_brightness(panel_bl,
+			panel_bl->props.brightness);
+
+	if (is_adaptive_sync_vrr(vrr_fps, vrr_mode))
+		changeable = (nit >= S6E3HAB_HUBBLE_ARR_MIN_LUMINANCE &&
+				nit <= S6E3HAB_HUBBLE_ARR_MAX_LUMINANCE);
+	else
+		changeable = (nit >= S6E3HAB_HUBBLE_BRR_MIN_LUMINANCE &&
+				nit <= S6E3HAB_HUBBLE_BRR_MAX_LUMINANCE);
+
+	return changeable;
+}
+#endif

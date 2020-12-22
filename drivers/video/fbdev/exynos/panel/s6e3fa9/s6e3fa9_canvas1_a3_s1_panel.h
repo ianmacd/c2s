@@ -373,6 +373,37 @@ static u8 CANVAS1_A3_S1_DIA[] = {
 	0xC6, 0x02,
 };
 
+static u8 CANVAS1_A3_S1_GAMMA_SETTING_1[] = {
+	0xB7,
+	0x00, 0x8D, 0xBB, 0x9B
+};
+
+static u8 CANVAS1_A3_S1_GAMMA_SETTING_2[] = {
+	0xB7,
+	0x00, 0x9A, 0xCC, 0xAC
+};
+
+static u8 CANVAS1_A3_S1_GAMMA_SETTING_3[] = {
+	0xB6,
+	0x00, 0xBB, 0xE6, 0xC4
+};
+
+static u8 CANVAS1_A3_S1_GAMMA_SETTING_4[] = {
+	0xB6,
+	0x04, 0xEA, 0x0A, 0xEA
+};
+
+static u8 CANVAS1_A3_S1_GAMMA_SETTING_5[] = {
+	0xB6,
+	0x04, 0xEA, 0x0A, 0xEA
+};
+
+static u8 CANVAS1_A3_S1_GAMMA_SETTING_6[] = {
+	0xB6,
+	0x04, 0xEA, 0x0A, 0xEA
+};
+
+
 #ifdef CONFIG_SUPPORT_DDI_CMDLOG
 static u8 CANVAS1_A3_S1_CMDLOG_ENABLE[] = { 0xF7, 0x80 };
 static u8 CANVAS1_A3_S1_CMDLOG_DISABLE[] = { 0xF7, 0x00 };
@@ -457,7 +488,7 @@ static DEFINE_PANEL_MDELAY(canvas1_a3_s1_wait_10msec, 10);
 static DEFINE_PANEL_UDELAY(canvas1_a3_s1_wait_33msec, 33400);
 
 static DEFINE_PANEL_MDELAY(canvas1_a3_s1_wait_100msec, 100);
-static DEFINE_PANEL_MDELAY(canvas1_a3_s1_wait_sleep_out_110msec, 110);
+static DEFINE_PANEL_MDELAY(canvas1_a3_s1_wait_sleep_out_120msec, 120);
 static DEFINE_PANEL_MDELAY(canvas1_a3_s1_wait_sleep_in, 120);
 static DEFINE_PANEL_UDELAY(canvas1_a3_s1_wait_1usec, 1);
 static DEFINE_PANEL_FRAME_DELAY(canvas1_a3_s1_wait_1_frame, 1);
@@ -495,6 +526,13 @@ static u8 CANVAS1_A3_S1_PASET[] = { 0x2B, 0x00, 0x00, 0x09, 0x5F };
 
 static DEFINE_STATIC_PACKET(canvas1_a3_s1_caset, DSI_PKT_TYPE_WR, CANVAS1_A3_S1_CASET, 0);
 static DEFINE_STATIC_PACKET(canvas1_a3_s1_paset, DSI_PKT_TYPE_WR, CANVAS1_A3_S1_PASET, 0);
+
+static DEFINE_STATIC_PACKET(canvas1_a3_s1_gamma_setting_1, DSI_PKT_TYPE_WR, CANVAS1_A3_S1_GAMMA_SETTING_1, 0x38);
+static DEFINE_STATIC_PACKET(canvas1_a3_s1_gamma_setting_2, DSI_PKT_TYPE_WR, CANVAS1_A3_S1_GAMMA_SETTING_2, 0x0C);
+static DEFINE_STATIC_PACKET(canvas1_a3_s1_gamma_setting_3, DSI_PKT_TYPE_WR, CANVAS1_A3_S1_GAMMA_SETTING_3, 0xDF);
+static DEFINE_STATIC_PACKET(canvas1_a3_s1_gamma_setting_4, DSI_PKT_TYPE_WR, CANVAS1_A3_S1_GAMMA_SETTING_4, 0xB3);
+static DEFINE_STATIC_PACKET(canvas1_a3_s1_gamma_setting_5, DSI_PKT_TYPE_WR, CANVAS1_A3_S1_GAMMA_SETTING_5, 0x87);
+static DEFINE_STATIC_PACKET(canvas1_a3_s1_gamma_setting_6, DSI_PKT_TYPE_WR, CANVAS1_A3_S1_GAMMA_SETTING_6, 0x5B);
 
 #if defined(CONFIG_SEC_FACTORY) && defined(CONFIG_SUPPORT_FAST_DISCHARGE)
 static u8 CANVAS1_A3_S1_FAST_DISCHARGE[] = { 0xB5, 0x40 };
@@ -622,7 +660,7 @@ static void *canvas1_a3_s1_init_cmdtbl[] = {
 	&KEYINFO(canvas1_a3_s1_level2_key_enable),
 	&KEYINFO(canvas1_a3_s1_level3_key_enable),
 	&PKTINFO(canvas1_a3_s1_sleep_out),
-	&DLYINFO(canvas1_a3_s1_wait_10msec),
+	&DLYINFO(canvas1_a3_s1_wait_sleep_out_120msec),
 	&PKTINFO(canvas1_a3_s1_caset),
 	&PKTINFO(canvas1_a3_s1_paset),
 	&PKTINFO(canvas1_a3_s1_te_on),
@@ -633,6 +671,12 @@ static void *canvas1_a3_s1_init_cmdtbl[] = {
 	&PKTINFO(canvas1_a3_s1_acl_default_2),
 	&PKTINFO(canvas1_a3_s1_smooth_dimming_init),
 	&PKTINFO(canvas1_a3_s1_dia),
+	&PKTINFO(canvas1_a3_s1_gamma_setting_1),
+	&PKTINFO(canvas1_a3_s1_gamma_setting_2),
+	&PKTINFO(canvas1_a3_s1_gamma_setting_3),
+	&PKTINFO(canvas1_a3_s1_gamma_setting_4),
+	&PKTINFO(canvas1_a3_s1_gamma_setting_5),
+	&PKTINFO(canvas1_a3_s1_gamma_setting_6),
 #if defined(CONFIG_SEC_FACTORY) && defined(CONFIG_SUPPORT_FAST_DISCHARGE)
 	&PKTINFO(canvas1_a3_s1_fast_discharge),
 #endif
@@ -643,7 +687,6 @@ static void *canvas1_a3_s1_init_cmdtbl[] = {
 	&KEYINFO(canvas1_a3_s1_level3_key_disable),
 	&KEYINFO(canvas1_a3_s1_level2_key_disable),
 	&KEYINFO(canvas1_a3_s1_level1_key_disable),
-	&DLYINFO(canvas1_a3_s1_wait_sleep_out_110msec),
 };
 
 static void *canvas1_a3_s1_res_init_cmdtbl[] = {

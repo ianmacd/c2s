@@ -152,6 +152,10 @@ int sensor_module_init(struct v4l2_subdev *subdev, u32 val)
 	if (ret < 0) {
 		if (device != NULL && ret == -EAGAIN) {
 			err("Checking sensor revision is fail. So retry camera power sequence.");
+			if (module->ext.use_retention_mode == SENSOR_RETENTION_ACTIVATED) {
+				err("Retention is temporarily off during rev_check");
+				module->ext.use_retention_mode = SENSOR_RETENTION_INACTIVE;
+			}
 			sensor_module_power_reset(subdev, device);
 			ret = CALL_CISOPS(&sensor_peri->cis, cis_check_rev_on_init, subdev_cis);
 			if (ret < 0) {

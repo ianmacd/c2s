@@ -700,6 +700,9 @@ static int usb_audio_probe(struct usb_interface *intf,
 		}
 	}
 	dev_set_drvdata(&dev->dev, chip);
+#ifdef CONFIG_USB_AUDIO_ENHANCED_DETECT_TIME
+	send_usb_audio_uevent(dev, chip->card->number, 1);
+#endif
 
 	/*
 	 * For devices with more than one control interface, we assume the
@@ -749,6 +752,9 @@ static int usb_audio_probe(struct usb_interface *intf,
 	return 0;
 
  __error:
+#ifdef CONFIG_SND_EXYNOS_USB_AUDIO
+	exynos_usb_audio_conn(0);
+#endif
 	if (chip) {
 		set_usb_audio_cardnum(chip->card->number, 0, 0);
 		/* chip->active is inside the chip->card object,

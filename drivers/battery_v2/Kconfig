@@ -605,6 +605,15 @@ config PREVENT_USB_CONN_OVERHEAT
 	help
 	  Say Y to enable CONFIG_PREVENT_USB_CONN_OVERHEAT
 
+config TX_5V_DISABLE
+    bool "disable TX in case of 5V"
+    default n
+    help
+	  Say Y to enable CONFIG_TX_5V_DISABLE
+	  Disable tx during 5V wired charging.
+	  Tx power efficiency is bad in projects that have small coil.
+	  apply this concept since bloom.
+
 config DISABLE_MFC_IC
     bool "disable mfc ic because of unknown pad"
     default n
@@ -613,3 +622,21 @@ config DISABLE_MFC_IC
 	  CONFIG_DISABLE_MFC_IC
 	  for unknown pad.
 	  disable mfc ic in this case.
+
+config CHECK_UNAUTH_PAD
+    bool "check unauthenticated pad"
+    default n
+    help
+	  Say Y to enable CONFIG_CHECK_UNAUTH_PAD
+	  do not charge rapidly
+	  when put device
+	  on the unauthenticated pad.
+
+config SEC_BATTERY_TEST
+    bool "KUnit test for sec_battery_test"
+    default n
+    depends on KUNIT
+    help
+        Say Y to enable CONFIG_SEC_BATTERY_TEST
+        This kunit test code is related to sec_battery.c.
+        Test the functions of sec_battery.c

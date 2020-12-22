@@ -173,7 +173,7 @@ static int __mfc_init_dec_ctx(struct mfc_ctx *ctx)
 	/* sh_handle: HDR10+ HEVC SEI meta */
 	dec->sh_handle_hdr.fd = -1;
 	dec->hdr10_plus_info = vmalloc(
-			(sizeof(struct hdr10_plus_meta) * MFC_MAX_DPBS));
+			(sizeof(struct hdr10_plus_meta) * MFC_MAX_BUFFERS));
 	if (!dec->hdr10_plus_info)
 		mfc_err_ctx("[HDR+] failed to allocate HDR10+ information data\n");
 

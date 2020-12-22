@@ -18,6 +18,7 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/exynos-pci-noti.h>
+#include <dt-bindings/pci/pci.h>
 #include "pcie-designware.h"
 #include "pcie-exynos-common.h"
 #include "pcie-exynos-host-v0.h"
@@ -53,9 +54,13 @@ void exynos_phy_all_pwrdn(struct exynos_pcie *exynos_pcie, int ch_num)
 
 	/* Trsv */
 	writel(0xFE, phy_base_regs + (0x57 * 4));
+	pr_info("[%s] phy_base + 0x15C = 0x%x\n", __func__,
+			readl(phy_base_regs + (0x57 * 4)));
 
 	/* Common */
 	writel(0xC1, phy_base_regs + (0x20 * 4));
+	pr_info("[%s] phy_base + 0x80 = 0x%x\n", __func__,
+			readl(phy_base_regs + (0x20 * 4)));
 
 	/* Set PCS values */
 	val = readl(phy_pcs_base_regs + 0x100);
@@ -72,12 +77,19 @@ void exynos_phy_all_pwrdn_clear(struct exynos_pcie *exynos_pcie, int ch_num)
 {
 	void __iomem *phy_base_regs = exynos_pcie->phy_base;
 	void __iomem *phy_pcs_base_regs = exynos_pcie->phy_pcs_base;
+	void __iomem *sysreg_base_regs = exynos_pcie->sysreg_base;
 
 	/* if you want to use channel 1, you need to set below register */
 	u32 __maybe_unused val;
 
 	if (ch_num == 1)
 		return ;
+
+	/* enable Lane0 */
+	writel(readl(sysreg_base_regs + 0xC) | (0x1 << 12),
+			sysreg_base_regs + 0xC);
+	pr_info("[%s] sysreg + 0x1050 = 0x%x\n", __func__,
+			readl(sysreg_base_regs + 0xC));
 
 	/* Set PCS values */
 	val = readl(phy_pcs_base_regs + 0x100);
@@ -184,13 +196,31 @@ void exynos_pcie_phy_config(struct exynos_pcie *exynos_pcie, int ch_num)
 	writel(readl(sysreg_base_regs + 0xC) | (0x1 << 12),
 			sysreg_base_regs + 0xC);
 
-	/* pcs_g_rst */
-	writel(0x1, elbi_base_regs + 0x288);
-	udelay(10);
-	writel(0x0, elbi_base_regs + 0x288);
-	udelay(10);
-	writel(0x1, elbi_base_regs + 0x288);
-	udelay(10);
+	if (exynos_pcie->ep_device_type == EP_BCM_WIFI) {
+		/* pcs_g_rst */
+		writel(0x1, elbi_base_regs + 0x288);
+		udelay(10);
+		writel(0x0, elbi_base_regs + 0x288);
+		udelay(10);
+		writel(0x1, elbi_base_regs + 0x288);
+		udelay(10);
+	}
+
+	if (exynos_pcie->ep_device_type == EP_QC_WIFI) {
+		/* pcs_g_rst */
+		writel(0x1, elbi_base_regs + PCIE_INIT_RSTN);
+		writel(0x1, elbi_base_regs + PCIE_LANE_RSTN);
+		writel(0x1, elbi_base_regs + PCIE_TRSV_RSTN);
+		writel(0x1, elbi_base_regs + PCIE_CMN_RSTN);
+		udelay(10);
+		writel(0x0, elbi_base_regs + PCIE_INIT_RSTN);
+		writel(0x0, elbi_base_regs + PCIE_LANE_RSTN);
+		writel(0x0, elbi_base_regs + PCIE_TRSV_RSTN);
+		writel(0x0, elbi_base_regs + PCIE_CMN_RSTN);
+		udelay(10);
+
+		writel(0x1, elbi_base_regs + PCIE_INIT_RSTN);
+	}
 
 	/* PHY Common block Setting */
 	{
@@ -216,44 +246,85 @@ void exynos_pcie_phy_config(struct exynos_pcie *exynos_pcie, int ch_num)
 		u32 reg_val;
 		/* tx latency */
 		writel(0x70, phy_pcs_base_regs + 0xF8);
+
 		/* pcs refclk out control */
-		writel(0x87, phy_pcs_base_regs + 0x100);
+		if (exynos_pcie->ep_device_type == EP_QC_WIFI)
+			writel(0x89, phy_pcs_base_regs + 0x100);
+		else
+			writel(0x87, phy_pcs_base_regs + 0x100);
+
 		writel(0x50, phy_pcs_base_regs + 0x104);
 		/* PRGM_TIMEOUT_L1SS_VAL Setting */
 		reg_val = readl(phy_pcs_base_regs + 0xC);
 		reg_val &= ~(0x1 << 1);
-		reg_val |= (0x1 << 4);
+		if (exynos_pcie->ep_device_type == EP_QC_WIFI)
+			reg_val &= ~(0x1 << 4);
+		else
+			reg_val |= (0x1 << 4);
 		writel(reg_val, phy_pcs_base_regs + 0xC);
+
+		if (exynos_pcie->ep_device_type == EP_QC_WIFI) {
+			reg_val = readl(phy_base_regs + 0x11C);
+			reg_val &= ~(0xf << 1);
+			reg_val |= (0x4 << 1);
+			writel(reg_val, phy_base_regs + 0x11C);
+
+			reg_val = readl(phy_base_regs + 0x120);
+			reg_val &= ~(0x1f << 1);
+			reg_val |= (0x6 << 1);
+			writel(reg_val, phy_base_regs + 0x120);
+
+			pr_info("#!#!#!#!#! %s: 0x114:0x%x, 0x11C:0x%x, 0x120:0x%x\n", __func__,
+					readl(phy_base_regs + 0x114),
+					readl(phy_base_regs + 0x11C),
+					readl(phy_base_regs + 0x120));
+		}
 	}
 
-	/* PCIE_MAC RST */
-	writel(0x1, elbi_base_regs + 0x290);
-	udelay(10);
-	writel(0x0, elbi_base_regs + 0x290);
-	udelay(10);
-	writel(0x1, elbi_base_regs + 0x290);
-	udelay(10);
+	if (exynos_pcie->ep_device_type == EP_QC_WIFI) {
+		pr_info("%s: L1ss entry/exit clock gating, 0x100:0x%x, 0xC:0x%x\n", __func__,
+				readl(phy_pcs_base_regs + 0x100), readl(phy_pcs_base_regs + 0xC));
+	}
 
-	/* PCIE_PHY PCS&PMA(CMN)_RST */
-	writel(0x1, elbi_base_regs + 0x28C);
-	udelay(10);
-	writel(0x0, elbi_base_regs + 0x28C);
-	udelay(10);
-	writel(0x1, elbi_base_regs + 0x28C);
-	udelay(100);
+	if (exynos_pcie->ep_device_type == EP_BCM_WIFI) {
+		/* PCIE_MAC RST */
+		writel(0x1, elbi_base_regs + 0x290);
+		udelay(10);
+		writel(0x0, elbi_base_regs + 0x290);
+		udelay(10);
+		writel(0x1, elbi_base_regs + 0x290);
+		udelay(10);
 
-	/* CDR Reset */
-	reg_val = readl(phy_pcs_base_regs + 0xD0);
-	reg_val |= (0x3 << 6);
-	writel(reg_val, phy_pcs_base_regs + 0xD0);
-	udelay(20);
-	reg_val = readl(phy_pcs_base_regs + 0xD0);
-	reg_val &= ~(0x3 << 6);
-	reg_val |= (0x2 << 6);
-	writel(reg_val, phy_pcs_base_regs + 0xD0);
-	reg_val &= ~(0x3 << 6);
-	writel(reg_val, phy_pcs_base_regs + 0xD0);
+		/* PCIE_PHY PCS&PMA(CMN)_RST */
+		writel(0x1, elbi_base_regs + 0x28C);
+		udelay(10);
+		writel(0x0, elbi_base_regs + 0x28C);
+		udelay(10);
+		writel(0x1, elbi_base_regs + 0x28C);
+		udelay(100);
 
+		/* CDR Reset */
+		reg_val = readl(phy_pcs_base_regs + 0xD0);
+		reg_val |= (0x3 << 6);
+		writel(reg_val, phy_pcs_base_regs + 0xD0);
+		udelay(20);
+		reg_val = readl(phy_pcs_base_regs + 0xD0);
+		reg_val &= ~(0x3 << 6);
+		reg_val |= (0x2 << 6);
+		writel(reg_val, phy_pcs_base_regs + 0xD0);
+		reg_val &= ~(0x3 << 6);
+		writel(reg_val, phy_pcs_base_regs + 0xD0);
+	}
+
+	if (exynos_pcie->ep_device_type == EP_QC_WIFI) {
+		mdelay(1);
+		writel(0x1, elbi_base_regs + PCIE_LANE_RSTN);
+		writel(0x1, elbi_base_regs + PCIE_TRSV_RSTN);
+		writel(0x1, elbi_base_regs + PCIE_CMN_RSTN);
+		mdelay(5);
+
+		pr_info("%s: phy init done\n", __func__);
+	}
 }
 
 void exynos_pcie_phy_init(struct pcie_port *pp)
@@ -276,8 +347,13 @@ void exynos_pcie_phy_init(struct pcie_port *pp)
 
 static void exynos_pcie_quirks(struct pci_dev *dev)
 {
+#if defined(CONFIG_EXYNOS_PCI_PM_ASYNC)
+	device_enable_async_suspend(&dev->dev);
+	pr_info("[%s:pcie_0] enable async_suspend\n", __func__);
+#else
 	device_disable_async_suspend(&dev->dev);
 	pr_info("[%s] async suspend disabled\n", __func__);
+#endif
 
 #if defined(CONFIG_EXYNOS_PCIE_IOMMU) || defined(CONFIG_EXYNOS_PCIE_S2MPU)
 	set_dma_ops(&dev->dev, &exynos_pcie_dma_ops);

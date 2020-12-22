@@ -98,6 +98,10 @@ config EXYNOS_PCIE_S2MPU
 	bool "Enable Exynos PCIe S2MPU"
 	depends on PCI_EXYNOS
 
+config EXYNOS_PCI_PM_ASYNC
+	bool "Enable Exynos PCI PM ASYNC SUSPEND/RESUME"
+	depends on PCI_EXYNOS
+
 config PCIE_IOMMU_HISTORY_LOG
 	bool "Enable Exynos PCIe IOMMU Map/Unmap History"
 	depends on EXYNOS_PCIE_IOMMU

@@ -19,10 +19,10 @@
 /*************************************************************************/
 
 /* accel range : 4g */
-#define MAX_ACCEL_1G		8192
-#define MAX_ACCEL_2G		16384
-#define MIN_ACCEL_2G		-16383
-#define MAX_ACCEL_4G		32768
+#define MAX_ACCEL_1G		(8192/2)
+#define MAX_ACCEL_2G		(16384/2)
+#define MIN_ACCEL_2G		(-16383/2)
+#define MAX_ACCEL_4G		(32768/2)
 
 static ssize_t accel_calibration_show(struct device *dev, char *buf)
 {

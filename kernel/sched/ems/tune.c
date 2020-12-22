@@ -322,6 +322,9 @@ static ssize_t emstune_mode_write(struct file *filp, const char __user *buf,
 			return ret;
 	}
 
+	if (value >= emstune_mode_count || value < 0)
+		return -EINVAL;
+
 	req = filp->private_data;
 	emstune_mode_change(value);
 	emstune_update_request(req, 0);

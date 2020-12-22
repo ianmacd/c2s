@@ -29,10 +29,6 @@
 #include "../aod/aod_drv.h"
 #endif
 
-#ifdef CONFIG_DYNAMIC_FREQ
-#include "ea8076_r8s_df_tbl.h"
-#endif
-
 #undef __pn_name__
 #define __pn_name__	r8s_pre
 
@@ -155,10 +151,12 @@ static u8 r8s_pre_lpm_on_table[4][1] = {
 	{0x22},	/* HLPM_60NIT */
 };
 
+#ifdef CONFIG_SUPPORT_XTALK_MODE
 static u8 r8s_pre_vgh_table[][1] = {
 	{ 0xC0 },	/* off 7.0 V */
 	{ 0x60 },	/* on 6.2 V */
 };
+#endif
 
 #if defined(CONFIG_SEC_FACTORY) && defined(CONFIG_SUPPORT_FAST_DISCHARGE)
 static u8 r8s_pre_fast_discharge_table[][1] = {
@@ -179,9 +177,6 @@ static struct maptbl r8s_pre_maptbl[MAX_MAPTBL] = {
 	[LPM_ON_MAPTBL] = DEFINE_2D_MAPTBL(r8s_pre_lpm_on_table, init_common_table, getidx_lpm_brt_table, copy_common_maptbl),
 #ifdef CONFIG_SUPPORT_XTALK_MODE
 	[VGH_MAPTBL] = DEFINE_2D_MAPTBL(r8s_pre_vgh_table, init_common_table, getidx_vgh_table, copy_common_maptbl),
-#endif
-#ifdef CONFIG_DYNAMIC_FREQ
-	[DYN_FFC_MAPTBL] = DEFINE_3D_MAPTBL(r8s_pre_dyn_ffc_table, init_common_table, getidx_dyn_ffc_table, copy_common_maptbl),
 #endif
 #if defined(CONFIG_SEC_FACTORY) && defined(CONFIG_SUPPORT_FAST_DISCHARGE)
 	[FAST_DISCHARGE_MAPTBL] = DEFINE_2D_MAPTBL(r8s_pre_fast_discharge_table, init_common_table, getidx_fast_discharge_table, copy_common_maptbl),
@@ -222,11 +217,6 @@ static u8 R8S_PRE_ERR_FG_ENABLE[] = {
 	0x00, 0x01, 0x19
 };
 
-static u8 R8S_PRE_ERR_FG_SETTING[] = {
-	0xED,
-	0x00, 0x4C,
-};
-
 static u8 R8S_PRE_ACL_DEFAULT_1[] = {
 	0xB9,
 	0x55, 0x27, 0x65,
@@ -237,24 +227,8 @@ static u8 R8S_PRE_ACL_DEFAULT_2[] = {
 	0x02, 0x61, 0x24, 0x49, 0x41, 0xFF, 0x00,
 };
 
-static u8 R8S_PRE_SMOOTH_DIMMING[] = {
-	0xB6, 0x03,
-};
-
 static u8 R8S_PRE_LPM_ON[] = { 0x53, 0x22 };
 static u8 R8S_PRE_LPM_NIT[] = { 0xBB, 0x89, 0x07 };
-
-
-#ifdef CONFIG_DYNAMIC_FREQ
-static u8 R8S_PRE_FFC[] = {
-	0xC5, /* default 1170 */
-	0x0D, 0x10, 0x64, 0x1E, 0xDB, 0x05, 0x00, 0x26,
-	0xB0
-};
-
-static DEFINE_PKTUI(r8s_pre_ffc, &r8s_pre_maptbl[DYN_FFC_MAPTBL], 4);
-static DEFINE_VARIABLE_PACKET(r8s_pre_ffc, DSI_PKT_TYPE_WR, R8S_PRE_FFC, 0);
-#endif
 
 static DEFINE_STATIC_PACKET(r8s_pre_level1_key_enable, DSI_PKT_TYPE_WR, R8S_PRE_KEY1_ENABLE, 0);
 static DEFINE_STATIC_PACKET(r8s_pre_level2_key_enable, DSI_PKT_TYPE_WR, R8S_PRE_KEY2_ENABLE, 0);
@@ -305,17 +279,14 @@ static DEFINE_VARIABLE_PACKET(r8s_pre_lpm_on, DSI_PKT_TYPE_WR, R8S_PRE_LPM_ON, 0
 static DEFINE_PKTUI(r8s_pre_lpm_nit, &r8s_pre_maptbl[LPM_NIT_MAPTBL], 1);
 static DEFINE_VARIABLE_PACKET(r8s_pre_lpm_nit, DSI_PKT_TYPE_WR, R8S_PRE_LPM_NIT, 0x02);
 
-static DEFINE_STATIC_PACKET(r8s_pre_smooth_dimming, DSI_PKT_TYPE_WR, R8S_PRE_SMOOTH_DIMMING, 0x04);
-
-static DEFINE_PANEL_MDELAY(r8s_pre_wait_1msec, 1);
+#ifdef CONFIG_SUPPORT_MASK_LAYER
 static DEFINE_PANEL_MDELAY(r8s_pre_wait_2msec, 2);
+#endif
 static DEFINE_PANEL_MDELAY(r8s_pre_wait_10msec, 10);
 static DEFINE_PANEL_UDELAY(r8s_pre_wait_33msec, 33400);
 
-static DEFINE_PANEL_MDELAY(r8s_pre_wait_100msec, 100);
 static DEFINE_PANEL_MDELAY(r8s_pre_wait_sleep_out_110msec, 110);
 static DEFINE_PANEL_MDELAY(r8s_pre_wait_sleep_in, 120);
-static DEFINE_PANEL_UDELAY(r8s_pre_wait_1usec, 1);
 static DEFINE_PANEL_FRAME_DELAY(r8s_pre_wait_1_frame, 1);
 
 static DEFINE_PANEL_KEY(r8s_pre_level1_key_enable, CMD_LEVEL_1, KEY_ENABLE, &PKTINFO(r8s_pre_level1_key_enable));
@@ -325,8 +296,10 @@ static DEFINE_PANEL_KEY(r8s_pre_level1_key_disable, CMD_LEVEL_1, KEY_DISABLE, &P
 static DEFINE_PANEL_KEY(r8s_pre_level2_key_disable, CMD_LEVEL_2, KEY_DISABLE, &PKTINFO(r8s_pre_level2_key_disable));
 static DEFINE_PANEL_KEY(r8s_pre_level3_key_disable, CMD_LEVEL_3, KEY_DISABLE, &PKTINFO(r8s_pre_level3_key_disable));
 
+#ifdef CONFIG_SUPPORT_MASK_LAYER
 static DEFINE_PANEL_VSYNC_DELAY(r8s_pre_wait_1_vsync, 1);
 static DEFINE_PANEL_VSYNC_DELAY(r8s_pre_wait_2_vsync, 2);
+#endif
 
 static u8 R8S_PRE_HBM_TRANSITION[] = {
 	0x53, 0x20
@@ -499,10 +472,6 @@ static void *r8s_pre_alpm_enter_cmdtbl[] = {
 	&KEYINFO(r8s_pre_level1_key_disable),
 };
 
-static void *r8s_pre_alpm_exit_cmdtbl[] = {
-	&DLYINFO(r8s_pre_wait_1usec),
-};
-
 static void *r8s_pre_alpm_enter_delay_cmdtbl[] = {
 	&DLYINFO(r8s_pre_wait_33msec),
 };
@@ -531,21 +500,13 @@ static void *r8s_pre_fast_discharge_cmdtbl[] = {
 };
 #endif
 
-#ifdef CONFIG_DYNAMIC_FREQ
-static void *r8s_pre_dynamic_ffc_cmdtbl[] = {
-	&KEYINFO(r8s_pre_level3_key_enable),
-	&PKTINFO(r8s_pre_ffc),
-	&KEYINFO(r8s_pre_level3_key_disable),
-};
-#endif
-
-
 static void *r8s_pre_check_condition_cmdtbl[] = {
 	&KEYINFO(r8s_pre_level2_key_enable),
 	&ea8076_dmptbl[DUMP_RDDPM],
 	&KEYINFO(r8s_pre_level2_key_disable),
 };
 
+#ifdef CONFIG_SUPPORT_MASK_LAYER
 static void *r8s_pre_mask_layer_before_cmdtbl[] = {
 	&DLYINFO(r8s_pre_wait_1_vsync),
 	&DLYINFO(r8s_pre_wait_2msec),
@@ -554,6 +515,7 @@ static void *r8s_pre_mask_layer_before_cmdtbl[] = {
 static void *r8s_pre_mask_layer_after_cmdtbl[] = {
 	&DLYINFO(r8s_pre_wait_2_vsync),
 };
+#endif
 
 static void *r8s_pre_dummy_cmdtbl[] = {
 	NULL,
@@ -572,15 +534,14 @@ static struct seqinfo r8s_pre_seqtbl[MAX_PANEL_SEQ] = {
 #ifdef CONFIG_SUPPORT_DDI_CMDLOG
 	[PANEL_CMDLOG_DUMP_SEQ] = SEQINFO_INIT("cmdlog-dump-seq", r8s_pre_cmdlog_dump_cmdtbl),
 #endif
-#ifdef CONFIG_DYNAMIC_FREQ
-	[PANEL_DYNAMIC_FFC_SEQ] = SEQINFO_INIT("dynamic-ffc-seq", r8s_pre_dynamic_ffc_cmdtbl),
-#endif
 #if defined(CONFIG_SEC_FACTORY) && defined(CONFIG_SUPPORT_FAST_DISCHARGE)
 	[PANEL_FD_SEQ] = SEQINFO_INIT("fast-discharge-seq", r8s_pre_fast_discharge_cmdtbl),
 #endif
 	[PANEL_CHECK_CONDITION_SEQ] = SEQINFO_INIT("check-condition-seq", r8s_pre_check_condition_cmdtbl),
+#ifdef CONFIG_SUPPORT_MASK_LAYER
 	[PANEL_MASK_LAYER_BEFORE_SEQ] = SEQINFO_INIT("mask-layer-before-seq", r8s_pre_mask_layer_before_cmdtbl),
 	[PANEL_MASK_LAYER_AFTER_SEQ] = SEQINFO_INIT("mask-layer-after-seq", r8s_pre_mask_layer_after_cmdtbl),
+#endif
 	[PANEL_DUMMY_SEQ] = SEQINFO_INIT("dummy-seq", r8s_pre_dummy_cmdtbl),
 };
 
@@ -617,9 +578,6 @@ struct common_panel_info ea8076_r8s_pre_panel_info = {
 	},
 #ifdef CONFIG_EXTEND_LIVE_CLOCK
 	.aod_tune = &ea8076_r8s_aod,
-#endif
-#ifdef CONFIG_DYNAMIC_FREQ
-	.df_freq_tbl = NULL,
 #endif
 
 #ifdef CONFIG_SUPPORT_DISPLAY_PROFILER

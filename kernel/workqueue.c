@@ -52,6 +52,11 @@
 #include <linux/nmi.h>
 #include <linux/sec_debug.h>
 #include <soc/samsung/exynos-debug.h>
+#ifdef CONFIG_SEC_DEBUG_SHOW_USER_STACK
+#include <linux/delay.h>
+#include <linux/hrtimer.h>
+#include "sched/sched.h"
+#endif
 
 #include "workqueue_internal.h"
 
@@ -337,6 +342,10 @@ static struct workqueue_attrs *unbound_std_wq_attrs[NR_STD_WORKER_POOLS];
 
 /* I: attributes used when instantiating ordered pools on demand */
 static struct workqueue_attrs *ordered_wq_attrs[NR_STD_WORKER_POOLS];
+
+#ifdef CONFIG_SEC_DEBUG_SHOW_USER_STACK
+static struct hrtimer debug_wqlockup_hrtimer;
+#endif
 
 struct workqueue_struct *system_wq __read_mostly;
 EXPORT_SYMBOL(system_wq);
@@ -5553,6 +5562,13 @@ static void wq_watchdog_reset_touched(void)
 		per_cpu(wq_watchdog_touched_cpu, cpu) = jiffies;
 }
 
+#ifdef CONFIG_SEC_DEBUG_SHOW_USER_STACK
+static enum hrtimer_restart debug_wqlockup(struct hrtimer *t)
+{
+	BUG();
+}
+#endif
+
 static void wq_watchdog_timer_fn(struct timer_list *unused)
 {
 	unsigned long thresh = READ_ONCE(wq_watchdog_thresh) * HZ;
@@ -5607,9 +5623,26 @@ static void wq_watchdog_timer_fn(struct timer_list *unused)
 	rcu_read_unlock();
 
 	if (lockup_detected) {
+#ifdef CONFIG_SEC_DEBUG_SHOW_USER_STACK
+		int cpu;
+		struct task_struct *p;
+
+		for_each_cpu(cpu, cpu_online_mask) {
+			p = cpu_curr(cpu);
+			pr_info("cpu %d, pid %d, task name : %s", cpu, p->pid, p->comm);
+			secdbg_send_sig_debuggerd(p, 2);
+		}
+#endif
 		show_workqueue_state();
 #ifdef CONFIG_SEC_DEBUG_WORKQUEUE_LOCKUP_PANIC
+#ifdef CONFIG_SEC_DEBUG_SHOW_USER_STACK
+		hrtimer_init(&debug_wqlockup_hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+		debug_wqlockup_hrtimer.function = debug_wqlockup;
+		hrtimer_start(&debug_wqlockup_hrtimer, ns_to_ktime(5000000000),
+				HRTIMER_MODE_REL_PINNED);
+#else
 		BUG();
+#endif
 #endif
 	}
 

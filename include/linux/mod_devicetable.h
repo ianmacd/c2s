@@ -762,4 +762,12 @@ struct typec_device_id {
 	kernel_ulong_t driver_data;
 };
 
+#ifdef CONFIG_MHI_BUS
+#define MHI_NAME_SIZE 32
+
+struct mhi_device_id {
+	const char chan[MHI_NAME_SIZE];
+	kernel_ulong_t driver_data;
+};
+#endif /* CONFIG_MHI_BUS */
 #endif /* LINUX_MOD_DEVICETABLE_H */

@@ -784,6 +784,48 @@ p_err:
 	return ret;
 }
 
+static int npu_vertex_profileon(struct file *file, struct vs4l_profiler *phead)
+{
+	int ret = 0;
+	struct npu_vertex_ctx *vctx = file->private_data;
+	//struct npu_vertex *vertex = vctx->vertex;
+	struct mutex *lock = &vctx->lock;
+
+	/* check npu_device emergency error */
+	ret = check_emergency_vctx(vctx);
+	if (ret)
+		return ret;
+
+	if (mutex_lock_interruptible(lock)) {
+		npu_ierr("fail in mutex_lock_interruptible\n", vctx);
+		return -ERESTARTSYS;
+	}
+	// allocate vision buffer
+	mutex_unlock(lock);
+	return 0;
+}
+
+static int npu_vertex_profileoff(struct file *file, struct vs4l_profiler *phead)
+{
+	int ret = 0;
+	struct npu_vertex_ctx *vctx = file->private_data;
+	//struct npu_vertex *vertex = vctx->vertex;
+	struct mutex *lock = &vctx->lock;
+
+	/* check npu_device emergency error */
+	ret = check_emergency_vctx(vctx);
+	if (ret)
+		return ret;
+
+	if (mutex_lock_interruptible(lock)) {
+		npu_ierr("fail in mutex_lock_interruptible\n", vctx);
+		return -ERESTARTSYS;
+	}
+	// deallocate vision buffer & update
+	mutex_unlock(lock);
+	return 0;
+}
+
 static int __force_streamoff(struct file *file)
 {
 	int ret = 0;
@@ -850,5 +892,7 @@ const struct vertex_ioctl_ops npu_vertex_ioctl_ops = {
 	.vertexioc_prepare      = npu_vertex_prepare,
 	.vertexioc_unprepare    = npu_vertex_unprepare,
 	.vertexioc_streamon     = npu_vertex_streamon,
-	.vertexioc_streamoff    = npu_vertex_streamoff
+	.vertexioc_streamoff    = npu_vertex_streamoff,
+	.vertexioc_profileon    = npu_vertex_profileon,
+	.vertexioc_profileoff   = npu_vertex_profileoff
 };

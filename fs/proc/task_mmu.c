@@ -1718,6 +1718,9 @@ cont:
 		if (PageTransCompound(page))
 			continue;
 
+		if (PageUnevictable(page))
+			continue;
+
 		if (isolate_lru_page(page))
 			continue;
 
@@ -1839,6 +1842,10 @@ static ssize_t reclaim_write(struct file *file, const char __user *buf,
 	else
 		goto out_err;
 
+#ifdef CONFIG_PROCESS_RECLAIM_IGNORE_ALL_TYPE
+	if (type == RECLAIM_ALL)
+		return count;
+#endif
 	if (type == RECLAIM_RANGE) {
 		char *token;
 		unsigned long long len, len_in, tmp;

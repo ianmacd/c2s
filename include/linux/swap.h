@@ -392,6 +392,11 @@ extern void check_move_unevictable_pages(struct page **, int nr_pages);
 
 extern int kswapd_run(int nid);
 extern void kswapd_stop(int nid);
+#ifdef CONFIG_KSWAPD_PERFTUNE
+extern int kswapd_perftune_cpumask;
+int sysctl_kswapd_perftune_cpumask_handler(struct ctl_table *table, int write,
+			void __user *buffer, size_t *length, loff_t *ppos);
+#endif
 
 #ifdef CONFIG_SWAP
 

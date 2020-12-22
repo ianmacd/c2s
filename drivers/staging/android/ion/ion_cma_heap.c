@@ -46,6 +46,12 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 	bool protected = cma_heap->secure && (flags & ION_FLAG_PROTECTED);
 	int ret = -ENOMEM;
 
+	if (!cma_heap->secure && (flags & ION_FLAG_PROTECTED)) {
+		perrfn("ION_FLAG_PROTECTED is set to non-secure heap %s",
+		       heap->name);
+		return -EINVAL;
+	}
+
 	pages = cma_alloc(cma_heap->cma, nr_pages, align, false);
 	if (!pages) {
 		perrfn("failed to allocate from %s(id %d), size %lu",

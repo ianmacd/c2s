@@ -212,14 +212,8 @@ static irqreturn_t ap_wakeup_handler(int irq, void *data)
 		return IRQ_HANDLED;
 	}
 
-	if (gpio_val == check_link_order) {
-		mif_err("skip : cp2ap_wakeup val is same with before : %d\n", gpio_val);
-		mc->apwake_irq_chip->irq_set_type(
-			irq_get_irq_data(mc->s5100_irq_ap_wakeup.num),
-			(gpio_val == 1 ? IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH));
-		mif_enable_irq(&mc->s5100_irq_ap_wakeup);
-		return IRQ_HANDLED;
-	}
+	if (gpio_val == check_link_order)
+		mif_err("cp2ap_wakeup val is the same with before : %d\n", gpio_val);
 	check_link_order = gpio_val;
 
 	spin_lock_irqsave(&mc->pcie_pm_lock, flags);
@@ -594,7 +588,6 @@ static int power_reset_dump_cp(struct modem_ctl *mc)
 	mif_info("s5100_cp_reset_required:%d\n", mc->s5100_cp_reset_required);
 	if (mc->s5100_cp_reset_required == true) {
 		mif_gpio_set_value(mc->s5100_gpio_cp_reset, 0, 50);
-
 #if defined(CONFIG_CP_WRESET_WA)
 		mif_gpio_set_value(mc->s5100_gpio_cp_pwr, 0, 0);
 		udelay(50);
@@ -637,7 +630,6 @@ static int power_reset_cp(struct modem_ctl *mc)
 	}
 
 	mif_gpio_set_value(mc->s5100_gpio_cp_reset, 0, 50);
-
 #if defined(CONFIG_CP_WRESET_WA)
 	mif_gpio_set_value(mc->s5100_gpio_cp_pwr, 0, 0);
 	udelay(50);
@@ -808,7 +800,7 @@ exit:
 	return err;
 }
 
-static int trigger_cp_crash(struct modem_ctl *mc)
+static int trigger_cp_crash_internal(struct modem_ctl *mc)
 {
 	struct link_device *ld = get_current_link(mc->bootd);
 	struct mem_link_device *mld = to_mem_link_device(ld);
@@ -834,18 +826,8 @@ static int trigger_cp_crash(struct modem_ctl *mc)
 			goto exit;
 		}
 
-		if (mif_gpio_set_value(mc->s5100_gpio_cp_dump_noti, 1, 1)) {
-			/* This code is temporary,
-			* we'll change triger_cp_crash to run at worker */
-			int value;
-			unsigned int gpio = mc->s5100_gpio_ap_status;
-			
-			value = mif_gpio_get_value(gpio, false);
-			mif_gpio_set_value(gpio, !value, 0);
-			dev_mdelay(5);
-			mif_gpio_set_value(gpio, value, 0);
-		}
-
+		if (mif_gpio_set_value(mc->s5100_gpio_cp_dump_noti, 1, 10))
+			mif_gpio_toggle_value(mc->s5100_gpio_ap_status, 50);
 
 		atomic_dec(&mc->dump_toggle_issued);
 #else
@@ -863,6 +845,18 @@ static int trigger_cp_crash(struct modem_ctl *mc)
 
 exit:
 	mif_err("---\n");
+	return 0;
+}
+
+static void trigger_cp_crash_work(struct work_struct *ws)
+{
+	struct modem_ctl *mc = container_of(ws, struct modem_ctl, crash_work);
+	trigger_cp_crash_internal(mc);
+}
+
+static int trigger_cp_crash(struct modem_ctl *mc)
+{
+	queue_work(mc->crash_wq, &mc->crash_work);
 	return 0;
 }
 
@@ -1566,9 +1560,15 @@ int s5100_init_modemctl_device(struct modem_ctl *mc, struct modem_data *pdata)
 		mif_err("%s: ERR! fail to create wakeup_wq\n", mc->name);
 		return -EINVAL;
 	}
-
 	INIT_WORK(&mc->wakeup_work, cp2ap_wakeup_work);
 	INIT_WORK(&mc->suspend_work, cp2ap_suspend_work);
+
+	mc->crash_wq = create_singlethread_workqueue("trigger_cp_crash_wq");
+	if (!mc->crash_wq) {
+		mif_err("%s: ERR! fail to create crash_wq\n", mc->name);
+		return -EINVAL;
+	}
+	INIT_WORK(&mc->crash_work, trigger_cp_crash_work);
 
 	mc->reboot_nb.notifier_call = s5100_reboot_handler;
 	register_reboot_notifier(&mc->reboot_nb);

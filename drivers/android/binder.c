@@ -3265,11 +3265,13 @@ static void freecess_async_binder_report(struct binder_proc *proc,
 	if (!proc || !target_proc || !tr || !t)
 		return;
 
-	// for android P verson, skip 8 bytes; for Q version, skip 12 bytes;
+	// for android P/Q/R verson, skip 8/12/16 bytes;
 	if (freecess_fw_version == 0)
 		skip_bytes = 8;
 	else if (freecess_fw_version == 1)
 		skip_bytes = 12;
+	else if (freecess_fw_version == 2)
+		skip_bytes = 16;
 
 	if ((tr->flags & TF_ONE_WAY) && target_proc
 		&& target_proc->tsk && target_proc->tsk->cred
@@ -5550,6 +5552,8 @@ err:
 			proc->tsk->comm, current->comm, cmd, arg, ret);
 err_unlocked:
 	trace_binder_ioctl_done(ret);
+	if (ret == -ERESTARTSYS)
+		ret = -EINTR;
 	return ret;
 }
 

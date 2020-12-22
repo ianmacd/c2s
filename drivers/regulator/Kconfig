@@ -1069,3 +1069,11 @@ config REGULATOR_S2DOS06
 	 via I2C bus.
 endif
 
+
+config S2DOS05_TEST
+	bool "KUnit test for s2dos05_test"
+	depends on KUNIT
+	help
+	  Enable KUnit test to test s2dos05 PMIC device driver.
+	  This unit test can work on local host based UML(User Mode Linux) and
+	  target devices.
