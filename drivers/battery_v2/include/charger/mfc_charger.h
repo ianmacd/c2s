@@ -150,6 +150,9 @@
 /* TX Min Operating Frequency = 60 MHz/value, default is 110kHz (60MHz/0x222=110) */
 #define MFC_TX_MIN_OP_FREQ_L_REG			0xD4 /* default 0x22 */
 #define MFC_TX_MIN_OP_FREQ_H_REG			0xD5 /* default 0x02 */
+
+#define TX_MIN_OP_FREQ_DEFAULT	113
+
 /* TX Max Operating Frequency = 60 MHz/value, default is 148kHz (60MHz/0x196=148) */
 #define MFC_TX_MAX_OP_FREQ_L_REG			0xD6 /* default 0x96 */
 #define MFC_TX_MAX_OP_FREQ_H_REG			0xD7 /* default 0x01 */
@@ -622,15 +625,16 @@ enum {
 };
 
 enum {
-    MFC_ADC_VOUT = 0,
-    MFC_ADC_VRECT,
-    MFC_ADC_RX_IOUT,
-    MFC_ADC_DIE_TEMP,
-    MFC_ADC_OP_FRQ,
-    MFC_ADC_TX_OP_FRQ,
-    MFC_ADC_PING_FRQ,
-    MFC_ADC_TX_IOUT,
-    MFC_ADC_TX_VOUT,
+	MFC_ADC_VOUT = 0,
+	MFC_ADC_VRECT,
+	MFC_ADC_RX_IOUT,
+	MFC_ADC_DIE_TEMP,
+	MFC_ADC_OP_FRQ,
+	MFC_ADC_TX_OP_FRQ,
+	MFC_ADC_TX_MIN_OP_FRQ,
+	MFC_ADC_PING_FRQ,
+	MFC_ADC_TX_IOUT,
+	MFC_ADC_TX_VOUT,
 };
 
 enum {
@@ -759,6 +763,44 @@ typedef struct _mfc_fod_data {
 	u32* data[FOD_STATE_MAX];
 } mfc_fod_data;
 
+#if defined(CONFIG_CHECK_UNAUTH_PAD)
+enum mfc_ping_freq {
+	FREQ_TXID,
+	FREQ_LOW,
+	FREQ_HIGH,
+	FREQ_MAX,
+	FREQ_TXID_MAX = 23,
+};
+
+static const u8 Ping_freq[FREQ_TXID_MAX][FREQ_MAX] = {
+	/*txid	freq_low	freq_high*/
+	{0x0,	0xFF,	0xFF},
+	{0x10,	0x8F,	0x95},
+	{0x14,	0x8F,	0x95},
+	{0x15,	0x8F,	0x95},
+	{0x16,	0x8F,	0x95},
+	{0x20,	0x8F,	0x95},
+	{0x21,	0x8F,	0x95},
+	{0x22,	0x8F,	0x95},
+	{0x24,	0x8F,	0x95},
+	{0x30,	0x8F,	0x95},
+
+	{0x31,	0x8F,	0x95},
+	{0x32,	0x8F,	0x95},
+	{0x33,	0x8F,	0x95},
+	{0x34,	0x7D,	0x83},
+	{0x35,	0x7D,	0x83},
+	{0x42,	0x8F,	0x95},
+	{0x42,	0x7D,	0x83},
+	{0xA0,	0x8F,	0x95},
+	{0xA1,	0x7D,	0x83},
+	{0xA2,	0x7D,	0x83},
+
+	{0xF3,	0x87,	0x8D},
+	{0xF3,	0x8F,	0x95},
+	{0xFF,	0xFF,	0xFF},
+};
+#endif
 static const u8 MTPVerifier9320[] = {
         0x00, 0x02, 0x00, 0x20, 0x99, 0x00, 0x00, 0x00, 0x9D, 0x00, 0x00, 0x00, 0x9F, 0x00, 0x00, 0x00,
         0x00, 0xF0, 0x02, 0xF8, 0x00, 0xF0, 0x30, 0xF8, 0x0C, 0xA0, 0x30, 0xC8, 0x08, 0x38, 0x24, 0x18,
@@ -1060,6 +1102,8 @@ struct mfc_charger_platform_data {
 	u32 oc_fod1;
 	u32 phone_fod_threshold;
 	u32 gear_ping_freq;
+	u32 gear_min_op_freq;
+	u32 gear_min_op_freq_delay;
 	bool wpc_vout_ctrl_lcd_on;
 
 	mfc_fod_data* fod_list;
@@ -1089,6 +1133,7 @@ struct mfc_charger_data {
 	struct wake_lock wpc_update_lock;
 	struct wake_lock wpc_opfq_lock;
 	struct wake_lock wpc_tx_opfq_lock;
+	struct wake_lock wpc_tx_min_opfq_lock;
 	struct wake_lock wpc_afc_vout_lock;
 	struct wake_lock wpc_vout_mode_lock;
 	struct wake_lock wpc_rx_det_lock;
@@ -1111,6 +1156,7 @@ struct mfc_charger_data {
 	struct delayed_work wpc_i2c_error_work;
 	struct delayed_work	wpc_rx_type_det_work;
 	struct delayed_work	wpc_rx_connection_work;
+	struct delayed_work wpc_tx_min_op_freq_work;
 	struct delayed_work wpc_tx_op_freq_work;
 	struct delayed_work wpc_tx_phm_work;
 	struct delayed_work wpc_vrect_check_work;
@@ -1166,5 +1212,9 @@ struct mfc_charger_data {
 
 	bool req_tx_id;
 	bool is_abnormal_pad;
+#if defined(CONFIG_CHECK_UNAUTH_PAD)
+	u8 ping_freq;
+	bool req_afc_tx;
+#endif
 };
 #endif /* __WIRELESS_CHARGER_MFC_H */

@@ -1962,7 +1962,7 @@ static int max77705_fg_set_property(struct power_supply *psy,
 #endif
 	case POWER_SUPPLY_PROP_ONLINE:
 		fuelgauge->cable_type = val->intval;
-		if (val->intval != SEC_BATTERY_CABLE_NONE) {
+		if (!is_nocharge_type(val->intval)) {
 			/* enable alert */
 			if (fuelgauge->vempty_mode >= VEMPTY_MODE_SW_VALERT) {
 				max77705_fg_set_vempty(fuelgauge, VEMPTY_MODE_HW);

@@ -1860,7 +1860,7 @@ EXPORT_SYMBOL(exynos_devfreq_get_profile);
 static int exynos_devfreq_update_profile(struct exynos_devfreq_data *data, int prev_lev)
 {
 	struct exynos_devfreq_profile *profile = data->profile;
-	u64 freq_stats0, freq_stats1, freq_stats2, freq_stats3;
+	u64 freq_stats0 = 0, freq_stats1 = 0, freq_stats2 = 0, freq_stats3 = 0;
 	ktime_t cur_time, cur_active;
 
 	exynos_bcm_get_data(&freq_stats0, &freq_stats2, &freq_stats3, &freq_stats1);

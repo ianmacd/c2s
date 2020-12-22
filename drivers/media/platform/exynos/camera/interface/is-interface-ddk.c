@@ -37,6 +37,7 @@ bool check_dma_done(struct is_hw_ip *hw_ip, u32 instance_id, u32 fcount)
 	u32 hw_fcount;
 	bool flag_get_meta = true;
 	ulong flags = 0;
+	u32 queued_count;
 
 	FIMC_BUG(!hw_ip);
 
@@ -45,11 +46,60 @@ bool check_dma_done(struct is_hw_ip *hw_ip, u32 instance_id, u32 fcount)
 
 	FIMC_BUG(!framemgr);
 
+flush_wait_done_frame:
 	framemgr_e_barrier_common(framemgr, 0, flags);
 	frame = peek_frame(framemgr, FS_HW_WAIT_DONE);
+	queued_count = framemgr->queued_count[FS_HW_WAIT_DONE];
 	framemgr_x_barrier_common(framemgr, 0, flags);
 
-	if (!frame) {
+	if (frame) {
+		if (frame->type == SHOT_TYPE_LATE) {
+			msinfo_hw("[F:%d,FF:%d,HWF:%d][WD%d] flush LATE_SHOT\n",
+				instance_id, hw_ip, fcount, frame->fcount, hw_fcount,
+				queued_count);
+
+			ret = is_hardware_frame_ndone(hw_ip, frame, frame->instance,
+				IS_SHOT_LATE_FRAME);
+			if (ret) {
+				mserr_hw("hardware_frame_ndone fail(LATE_SHOT)",
+					frame->instance, hw_ip);
+				return true;
+			}
+
+			goto flush_wait_done_frame;
+		} else {
+			if (unlikely(frame->fcount < fcount)) {
+				/* Flush the old frame which is in HW_WAIT_DONE state & retry. */
+				mswarn_hw("[F:%d,FF:%d,HWF:%d][WD%d] invalid frame(idx:%d)",
+					instance_id, hw_ip, fcount, frame->fcount, hw_fcount,
+					queued_count, frame->cur_buf_index);
+
+				framemgr_e_barrier_common(framemgr, 0, flags);
+				frame_manager_print_info_queues(framemgr);
+				framemgr_x_barrier_common(framemgr, 0, flags);
+
+				ret = is_hardware_frame_ndone(hw_ip, frame, frame->instance,
+					IS_SHOT_INVALID_FRAMENUMBER);
+				if (ret) {
+					mserr_hw("hardware_frame_ndone fail(old frame)",
+						frame->instance, hw_ip);
+					return true;
+				}
+
+				goto flush_wait_done_frame;
+			} else if (unlikely(frame->fcount > fcount)) {
+				mswarn_hw("[F:%d,FF:%d,HWF:%d][WD%d] Too early frame. Skip it.",
+					instance_id, hw_ip, fcount, frame->fcount, hw_fcount,
+					queued_count);
+
+				framemgr_e_barrier_common(framemgr, 0, flags);
+				frame_manager_print_info_queues(framemgr);
+				framemgr_x_barrier_common(framemgr, 0, flags);
+
+				return true;
+			}
+		}
+	} else {
 		/* Flush the old frame which is in HW_CONFIGURE state & skip dma_done. */
 flush_config_frame:
 		framemgr_e_barrier_common(framemgr, 0, flags);
@@ -327,7 +377,7 @@ static void is_lib_io_callback(void *this, enum lib_cb_event_type event_id,
 		break;
 	case LIB_EVENT_ERROR_CIN_OVERFLOW:
 		is_debug_event_count(IS_EVENT_OVERFLOW_3AA);
-		exynos_bcm_dbg_stop(CAMERA_DRIVER);
+		exynos_bcm_dbg_stop(PANIC_HANDLE);
 		msinfo_hw("LIB_EVENT_ERROR_CIN_OVERFLOW\n", instance_id, hw_ip);
 		is_hardware_flush_frame(hw_ip, FS_HW_CONFIGURE, IS_SHOT_OVERFLOW);
 

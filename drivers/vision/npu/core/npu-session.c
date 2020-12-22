@@ -1490,7 +1490,7 @@ static int npu_session_queue(struct npu_queue *queue, struct vb_container_list *
 	u32 j;
 	u32 buff_cnt;
 
-	frame_cmd_e frame_cmd;
+	frame_cmd_e frame_cmd = NPU_FRAME_CMD_Q;
 
 	BUG_ON(!queue);
 	BUG_ON(!incl);
@@ -1498,11 +1498,12 @@ static int npu_session_queue(struct npu_queue *queue, struct vb_container_list *
 	BUG_ON(!otcl);
 	/*BUG_ON(!otcl->index >= NPU_MAX_FRAME);*/
 
-	if (otcl->profiler != NULL) {
+	if (otcl->timestamp[5].tv_sec) {
 		frame_cmd = NPU_FRAME_CMD_PROFILER;
 	} else {
 		frame_cmd = NPU_FRAME_CMD_Q;
 	}
+
 	vctx = container_of(queue, struct npu_vertex_ctx, queue);
 	session = container_of(vctx, struct npu_session, vctx);
 

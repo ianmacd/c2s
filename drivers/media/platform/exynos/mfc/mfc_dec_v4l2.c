@@ -597,8 +597,8 @@ static int mfc_dec_s_fmt_vid_cap_mplane(struct file *file, void *priv,
 							struct v4l2_format *f)
 {
 	struct mfc_ctx *ctx = fh_to_mfc_ctx(file->private_data);
-	struct mfc_fmt *dst_fmt;
 	struct v4l2_pix_format_mplane *pix_fmt_mp = &f->fmt.pix_mp;
+	struct mfc_fmt *fmt = NULL;
 
 	mfc_debug_enter();
 
@@ -607,12 +607,12 @@ static int mfc_dec_s_fmt_vid_cap_mplane(struct file *file, void *priv,
 		return -EBUSY;
 	}
 
-	dst_fmt = __mfc_dec_find_format(ctx, pix_fmt_mp->pixelformat);
-	if (!dst_fmt) {
+	fmt = __mfc_dec_find_format(ctx, pix_fmt_mp->pixelformat);
+	if (!fmt) {
 		mfc_err_ctx("Unsupported format for destination\n");
 		return -EINVAL;
 	}
-	ctx->dst_fmt = dst_fmt;
+	ctx->dst_fmt = fmt;
 	ctx->raw_buf.num_planes = ctx->dst_fmt->num_planes;
 	mfc_info_ctx("[FRAME] dec dst pixelformat : %s\n", ctx->dst_fmt->name);
 
@@ -658,8 +658,8 @@ static int mfc_dec_s_fmt_vid_out_mplane(struct file *file, void *priv,
 	struct mfc_dev *dev = video_drvdata(file);
 	struct mfc_ctx *ctx = fh_to_mfc_ctx(file->private_data);
 	struct mfc_dec *dec = ctx->dec_priv;
-	struct mfc_fmt *src_fmt;
 	struct v4l2_pix_format_mplane *pix_fmt_mp = &f->fmt.pix_mp;
+	struct mfc_fmt *fmt = NULL;
 	int ret = 0;
 
 	mfc_debug_enter();
@@ -669,12 +669,13 @@ static int mfc_dec_s_fmt_vid_out_mplane(struct file *file, void *priv,
 		return -EBUSY;
 	}
 
-	src_fmt = __mfc_dec_find_format(ctx, pix_fmt_mp->pixelformat);
-	if (!src_fmt) {
+	fmt = __mfc_dec_find_format(ctx, pix_fmt_mp->pixelformat);
+	if (!fmt) {
 		mfc_err_ctx("Unsupported format for source\n");
 		return -EINVAL;
 	}
-	ctx->src_fmt=src_fmt;
+	ctx->src_fmt = fmt;
+
 	ctx->codec_mode = ctx->src_fmt->codec_mode;
 	mfc_info_ctx("[STREAM] Dec src codec(%d): %s\n",
 			ctx->codec_mode, ctx->src_fmt->name);
@@ -894,7 +895,12 @@ static int mfc_dec_qbuf(struct file *file, void *priv, struct v4l2_buffer *buf)
 		return -EIO;
 	}
 
-	if (V4L2_TYPE_IS_MULTIPLANAR(buf->type) && !buf->length) {
+	if (!V4L2_TYPE_IS_MULTIPLANAR(buf->type)) {
+		mfc_err_ctx("Invalid V4L2 Buffer for driver: type(%d)\n", buf->type);
+		return -EINVAL;
+	}
+
+	if (!buf->length) {
 		mfc_err_ctx("multiplanar but length is zero\n");
 		return -EIO;
 	}
@@ -945,6 +951,12 @@ static int mfc_dec_dqbuf(struct file *file, void *priv, struct v4l2_buffer *buf)
 		mfc_err_ctx("Call on DQBUF after unrecoverable error\n");
 		return -EIO;
 	}
+
+	if (!V4L2_TYPE_IS_MULTIPLANAR(buf->type)) {
+		mfc_err_ctx("Invalid V4L2 Buffer for driver: type(%d)\n", buf->type);
+		return -EINVAL;
+	}
+
 	if (buf->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
 		mfc_debug(4, "dec src buf[%d] DQ\n", buf->index);
 		ret = vb2_dqbuf(&ctx->vq_src, buf, file->f_flags & O_NONBLOCK);
@@ -952,7 +964,7 @@ static int mfc_dec_dqbuf(struct file *file, void *priv, struct v4l2_buffer *buf)
 		mfc_debug(4, "dec dst buf[%d] DQ\n", buf->index);
 		ret = vb2_dqbuf(&ctx->vq_dst, buf, file->f_flags & O_NONBLOCK);
 
-		if (buf->index >= MFC_MAX_DPBS) {
+		if (buf->index >= MFC_MAX_BUFFERS) {
 			mfc_err_ctx("buffer index[%d] range over\n", buf->index);
 			return -EINVAL;
 		}

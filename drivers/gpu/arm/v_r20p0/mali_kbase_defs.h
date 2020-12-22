@@ -1603,6 +1603,8 @@ struct kbase_device {
 	s8 nr_hw_address_spaces;
 	s8 nr_user_address_spaces;
 
+	/* MALI_SEC_INTEGRATION */
+#ifdef CONFIG_MALI_TSG
 	int queued_total_job_nr;
 	int in_js_total_job_nr;
 	int hw_complete_job_nr_cnt;
@@ -1614,6 +1616,7 @@ struct kbase_device {
 	ktime_t queued_time_tick[2];	/* job queued time, index represents queued_time each threshold */
 	unsigned int queued_threshold[2];
 	ktime_t queued_time[2];
+#endif
 
 	struct kbase_hwcnt {
 		/* The lock should be used when accessing any of the following members */

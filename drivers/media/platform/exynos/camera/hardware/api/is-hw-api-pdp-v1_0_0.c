@@ -38,6 +38,8 @@
 #define PDP_GET_V(reg_val, F) \
 	is_hw_get_field_value(reg_val, &pdp_fields[F])
 
+#define PDP_RDMA_MO_TICK	10
+
 #define PDP_RDMA_MO_DEFAULT	3
 #define PDP_RDMA_MO_FPS60	5
 
@@ -543,6 +545,7 @@ void pdp_hw_s_line_row(void __iomem *base, bool pd_enable, int sensor_mode, u32 
 			break;
 		case VC_SENSOR_MODE_ULTRA_PD_TAIL:
 		case VC_SENSOR_MODE_ULTRA_PD_2_TAIL:
+		case VC_SENSOR_MODE_ULTRA_PD_3_TAIL:
 			density = 8;
 			tail_density = density / 2;
 			break;
@@ -949,12 +952,16 @@ int pdp_hw_s_one_shot_enable(struct is_pdp *pdp)
 		/* Increase RMO */
 		if (!try_cnt) {
 			rmo = PDP_GET_R(base, PDP_R_RDMA_BAYER_MO);
-			PDP_SET_R(base, PDP_R_RDMA_BAYER_MO, rmo + 1);
-			PDP_SET_R(base, PDP_R_RDMA_AF_MO, rmo + 1);
+			rmo = max(rmo, pdp->rmo) + pdp->rmo;
+			rmo = min(rmo, (u32)((1 << pdp_fields[PDP_F_RDMA_BAYER_MO].bit_width) - 1));
+
+			PDP_SET_R(base, PDP_R_RDMA_BAYER_MO, rmo);
+			PDP_SET_R(base, PDP_R_RDMA_AF_MO, rmo);
+			pdp->rmo_tick = PDP_RDMA_MO_TICK;
 		}
 
-		info_hw("[PDP%d] oneshot busy(RMO:%d->%d, total:%d, curr:%d,%d, try:%d)\n",
-			pdp->id, rmo, rmo + 1, total_line, curr_line, curr_col, try_cnt);
+		info_hw("[PDP%d] oneshot busy(RMO:%d, total:%d, curr:%d,%d, try:%d)\n",
+			pdp->id, rmo, total_line, curr_line, curr_col, try_cnt);
 
 		try_cnt++;
 		if (try_cnt >= 3) {
@@ -986,7 +993,7 @@ int pdp_hw_s_one_shot_enable(struct is_pdp *pdp)
 	spin_unlock_irqrestore(&pdp->slock_oneshot, flag);
 
 	/* Restore RMO */
-	if (!try_cnt) {
+	if (!try_cnt && (--pdp->rmo_tick <= 0)) {
 		rmo = PDP_GET_R(base, PDP_R_RDMA_BAYER_MO);
 		if (rmo != pdp->rmo) {
 			PDP_SET_R(base, PDP_R_RDMA_BAYER_MO, pdp->rmo);

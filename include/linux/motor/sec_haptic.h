@@ -93,4 +93,8 @@ struct sec_haptic_drvdata {
 extern int sec_haptic_register(struct sec_haptic_drvdata *ddata);
 extern int sec_haptic_unregister(struct sec_haptic_drvdata *ddata);
 
+#ifdef CONFIG_KUNIT
+extern int sec_haptic_set_frequency(struct sec_haptic_drvdata *ddata, int num);
+#endif
+
 #endif /* SEC_HAPTIC_H */

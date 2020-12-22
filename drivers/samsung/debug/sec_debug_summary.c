@@ -15,7 +15,7 @@
 #include "sec_debug_internal.h"
 
 static unsigned long summ_base;
-static unsigned int summ_size;
+static unsigned long summ_size;
 
 static ssize_t secdbg_summ_read(struct file *file, char __user *buf,
 				  size_t len, loff_t *offset)
@@ -25,7 +25,7 @@ static ssize_t secdbg_summ_read(struct file *file, char __user *buf,
 	char *base = NULL;
 
 	if (!summ_size) {
-		pr_crit("%s: size 0? %x\n", __func__, summ_size);
+		pr_crit("%s: size 0? %lx\n", __func__, summ_size);
 
 		ret = -ENXIO;
 
@@ -41,7 +41,7 @@ static ssize_t secdbg_summ_read(struct file *file, char __user *buf,
 	}
 
 	if (pos >= summ_size) {
-		pr_crit("%s: pos %llx , dhist: %x\n", __func__, pos, summ_size);
+		pr_crit("%s: pos %llx , summ_size: %lx\n", __func__, pos, summ_size);
 
 		ret = 0;
 
@@ -86,7 +86,7 @@ static int __init secdbg_summ_late_init(void)
 	base = (char *)phys_to_virt((phys_addr_t)summ_base);
 	summ_size = secdbg_base_get_buf_size(SDN_MAP_DUMP_SUMMARY);
 
-	pr_info("%s: base: %p(%lx) size: %x\n", __func__, base, summ_base, summ_size);
+	pr_info("%s: base: %p(%lx) size: %lx\n", __func__, base, summ_base, summ_size);
 
 	entry = proc_create("reset_summary", S_IFREG | 0444, NULL, &summ_file_ops);
 	if (!entry) {

@@ -26,41 +26,9 @@ static int panel_debug_log_show(struct seq_file *s)
 	return 0;
 }
 
-static int panel_debug_log_store(struct seq_file *s,
-		const char *buf, size_t size)
-{
-	int rc = 0;
-	int res = 0;
-
-	rc = kstrtoint(buf, 0, &res);
-	if (rc < 0)
-		return 0;
-
-	panel_log_level = res;
-	panel_info("set panel_log_level %d\n", panel_log_level);
-
-	return 0;
-}
-
 static int panel_debug_cmd_log_show(struct seq_file *s)
 {
 	seq_printf(s, "%d\n", panel_cmd_log);
-
-	return 0;
-}
-
-static int panel_debug_cmd_log_store(struct seq_file *s,
-		const char *buf, size_t size)
-{
-	int rc = 0;
-	int res = 0;
-
-	rc = kstrtoint(buf, 0, &res);
-	if (rc < 0)
-		return 0;
-
-	panel_cmd_log = res;
-	panel_info("set panel_cmd_log %d\n", panel_cmd_log);
 
 	return 0;
 }
@@ -83,44 +51,34 @@ static int panel_debug_simple_show(struct seq_file *s, void *unused)
 	return 0;
 }
 
-#define MAX_PANEL_DEBUG_INPUT_BUF_SIZE	(256)
-static ssize_t panel_debug_simple_write(struct file *file, const char __user *buf,
-		size_t count, loff_t *f_ops)
+static ssize_t panel_debug_simple_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *f_ops)
 {
 	struct seq_file *s;
 	struct panel_debugfs *debugfs;
-	char *data;
-	int len;
+	int rc = 0;
+	int res = 0;
 
 	s = file->private_data;
 	debugfs = s->private;
 
-	len = min((size_t)MAX_PANEL_DEBUG_INPUT_BUF_SIZE, count);
-	if (len <= 0)
-		return count;
-
-	data = kmalloc(len, GFP_KERNEL);
-	if (!data)
-		return count;
-
-	if (copy_from_user(data, buf, len))
-		goto out;
-
-	data[len - 1] = '\0';
+	rc = kstrtoint_from_user(buf, count, 10, &res);
+	if (rc)
+		return rc;
 
 	switch (debugfs->id) {
 	case PANEL_DEBUGFS_LOG:
-		panel_debug_log_store(s, data, len);
+		panel_log_level = res;
+		panel_info("panel_log_level: %d\n", panel_log_level);
 		break;
 	case PANEL_DEBUGFS_CMD_LOG:
-		panel_debug_cmd_log_store(s, data, len);
+		panel_cmd_log = res;
+		panel_info("panel_cmd_log: %d\n", panel_cmd_log);
 		break;
 	default:
 		break;
 	}
 
-out:
-	kfree(data);
 	return count;
 }
 

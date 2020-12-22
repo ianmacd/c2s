@@ -1735,10 +1735,6 @@ static int npu_protodrv_handler_frame_completed(void)
 			npu_uferr("unlink_session_frame failed : %d\n", &entry->frame, ret);
 		}
 
-		if (entry->frame.output->profiler->level == 1) {
-			entry->frame.output->profiler->node->duration = entry->frame.duration;
-		}
-
 		/* Time keeping */
 		npu_ufdbg("(COMPLETED)frame: cmd(%u) / req_id(%d) / result(%u/0x%08x) NPU-TIMESTAT:%s\n",
 			&entry->frame, entry->frame.cmd, entry->frame.npu_req_id,

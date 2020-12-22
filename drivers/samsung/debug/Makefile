@@ -32,5 +32,5 @@ obj-$(CONFIG_SEC_DEBUG_WATCHDOGD_FOOTPRINT)	+= sec_debug_wdd_info.o
 obj-$(CONFIG_SEC_DEBUG_FREQ)		+= sec_debug_freq.o
 obj-$(CONFIG_SEC_DEBUG_COMPLETE_HINT)	+= sec_debug_complete_hint.o
 obj-$(CONFIG_SEC_DEBUG_DTASK)		+= sec_debug_dtask.o
-obj-$(CONFIG_SEC_PERF_LATENCYCHECKER)   += sec_perf_latencychecker.o
 obj-$(CONFIG_SEC_DEBUG_SOFTDOG)   	+= sec_debug_softdog.o
+obj-$(CONFIG_SEC_DEBUG_SHOW_USER_STACK)	+= sec_debug_show_user_stack.o

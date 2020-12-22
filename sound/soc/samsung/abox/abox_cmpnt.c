@@ -6356,3 +6356,9 @@ int abox_cmpnt_register(struct device *adev)
 
 	return snd_soc_register_component(adev, cmpnt_drv, dai_drv, num_dai);
 }
+
+#ifdef CONFIG_SND_SOC_SAMSUNG_AUDIO
+#ifdef CONFIG_ABOX_CMPNT_TEST
+#include "./kunit_test/abox_cmpnt_test.c"
+#endif
+#endif

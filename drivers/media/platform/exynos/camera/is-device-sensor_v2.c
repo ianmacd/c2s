@@ -1089,11 +1089,34 @@ int is_sensor_buf_tag(struct is_device_sensor *device,
 	unsigned long flags;
 	struct is_framemgr *framemgr;
 	struct is_frame *frame;
+	struct is_framemgr *ldr_framemgr;
+	struct is_group *group;
+	int ldr_req_cnt, sub_req_cnt;
+	int ldr_pro_cnt, sub_pro_cnt;
+
+	group = &device->group_sensor;
+	ldr_framemgr = GET_SUBDEV_FRAMEMGR(&group->leader);
+	FIMC_BUG(!ldr_framemgr);
 
 	framemgr = GET_SUBDEV_FRAMEMGR(f_subdev);
 	FIMC_BUG(!framemgr);
 
 	framemgr_e_barrier_irqs(framemgr, 0, flags);
+
+	if (!test_bit(IS_SENSOR_OTF_OUTPUT, &device->state)) {
+		ldr_req_cnt = ldr_framemgr->queued_count[FS_REQUEST];
+		ldr_pro_cnt = ldr_framemgr->queued_count[FS_PROCESS];
+		sub_req_cnt = framemgr->queued_count[FS_REQUEST];
+		sub_pro_cnt = framemgr->queued_count[FS_PROCESS];
+
+		if ((sub_req_cnt > ldr_req_cnt) || (sub_pro_cnt > ldr_pro_cnt))
+			mgrwarn("subdev DQ might be blocked: ldr(R%d, P%d, C%d), sub[%s](R%d, P%d, C%d)",
+				group, group,
+				ldr_frame, ldr_req_cnt, ldr_pro_cnt,
+				ldr_framemgr->queued_count[FS_COMPLETE],
+				f_subdev->name, sub_req_cnt, sub_pro_cnt,
+				framemgr->queued_count[FS_COMPLETE]);
+	}
 
 	frame = peek_frame(framemgr, FS_REQUEST);
 	if (frame) {
@@ -1115,7 +1138,6 @@ int is_sensor_buf_tag(struct is_device_sensor *device,
 			ret = -EINVAL;
 		} else {
 			set_bit(f_subdev->id, &ldr_frame->out_flag);
-			trans_frame(framemgr, frame, FS_PROCESS);
 
 			if (test_bit(IS_SUBDEV_VOTF_USE, &f_subdev->state)) {
 				/* update mater first for preventing mismatch */
@@ -3321,10 +3343,11 @@ int is_sensor_g_fast_mode(struct is_device_sensor *device)
 	framerate = is_sensor_g_framerate(device);
 	height = is_sensor_g_height(device);
 
-	if (ex_mode == EX_DUALFPS_960 ||
+	if (test_bit(IS_SENSOR_OTF_OUTPUT, &device->state) &&
+		(ex_mode == EX_DUALFPS_960 ||
 		ex_mode == EX_DUALFPS_480 ||
 		framerate >= 240 ||
-		height <= LINE_FOR_SHOT_VALID_TIME)
+		height <= LINE_FOR_SHOT_VALID_TIME))
 		return 1;
 	else
 		return 0;
@@ -3665,6 +3688,12 @@ static int is_sensor_back_stop(void *qdevice,
 		mwarn("already back stop", device);
 		goto p_err;
 	}
+
+	/*
+	 * If OTF case, skip force buffer done for sensor leader's frame
+	 * because force buffer done will be done in process_stop sequence.
+	 */
+	is_sensor_group_force_stop(device, device->group_sensor.id);
 
 	ret = is_group_stop(groupmgr, group);
 	if (ret)
@@ -4216,30 +4245,9 @@ static int is_sensor_shot(struct is_device_ischain *ischain,
 		goto p_err;
 	}
 
-	if (!test_bit(IS_SENSOR_OTF_OUTPUT, &sensor->state)) {
-		/* In case of M2M case, check the late shot */
-		if (test_bit(IS_SENSOR_FRONT_START, &sensor->state) &&
-			(sensor->line_fcount + 1) > frame->fcount) {
-			merr("[G%d] late shot (sensor:%d, line:%d, frame:%d, scount:%d)", ischain, group->id,
-					sensor->fcount, sensor->line_fcount,
-					frame->fcount, atomic_read(&group->scount));
-			ret = -EINVAL;
-			goto p_err;
-		}
-
-		/*
-		 * (M2M) return without first shot only.
-		 * Because second shot was applied in line interrupt
-		 * like concept of 3AA configure lock.
-		 *
-		 * case1) After sensor stream on
-		 * case2) Before sensor stream on and it's first shot
-		 */
-		if (test_bit(IS_SENSOR_FRONT_START, &sensor->state) ||
-			(!test_bit(IS_SENSOR_FRONT_START, &sensor->state)
-			&& atomic_read(&group->scount)))
-			goto p_err;
-	}
+	/* It is used for sensor only scenario such as TOF sensor or remosic sequence. */
+	if (!test_bit(IS_SENSOR_OTF_OUTPUT, &sensor->state))
+		goto shot_callback;
 
 	mgrdbgs(1, " DEVICE SENSOR SHOT CALLBACK(%d) (sensor:%d, line:%d, scount:%d)\n",
 		group->device, group, frame, frame->index,
@@ -4265,6 +4273,7 @@ static int is_sensor_shot(struct is_device_ischain *ischain,
 
 	PROGRAM_COUNT(8);
 
+shot_callback:
 	ret = is_devicemgr_shot_callback(group, frame, frame->fcount, IS_DEVICE_SENSOR);
 	if (ret) {
 		merr("is_ischainmgr_shot_callback fail(%d)", ischain, ret);

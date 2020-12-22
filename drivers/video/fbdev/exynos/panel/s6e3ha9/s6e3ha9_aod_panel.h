@@ -472,15 +472,15 @@ static char S6E3HA9_AOD_ANALOG_MASK[] = {
 	0x77,
 	0x00,
 	0x50, 0x13, 0x50, 0x13, 0x50, 0x13,
-	0x0F, 0x07, 0x85, 0x1F, 0x0F, 0x07, 0xA6, 0x20, 0x01, 0x00, 0xB2, 0x28, /*s6e3ha9_aod_analog_mask*/
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /*s6e3ha9_aod_analog_mask*/
 };
 static DEFINE_STATIC_PACKET(s6e3ha9_aod_analog_mask, DSI_PKT_TYPE_WR, S6E3HA9_AOD_ANALOG_MASK, 7);
 
 static char S6E3HA9_AOD_ANALOG_MEM[] = {
 	0x77,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /*s6e3ha9_aod_analog_mem*/
-	0x00,
-	0x08
+	0x07,
+	0x07
 };
 static DEFINE_STATIC_PACKET(s6e3ha9_aod_analog_mem, DSI_PKT_TYPE_WR, S6E3HA9_AOD_ANALOG_MEM, 26);
 
@@ -501,11 +501,7 @@ static DEFINE_VARIABLE_PACKET(s6e3ha9_aod_time, DSI_PKT_TYPE_WR, S6E3HA9_AOD_TIM
 
 static char S6E3HA9_AOD_TIMER_RATE[] = {
 	0x81,
-#if 1 // for test
-	0x1E, 0x03, /* s6e3ha9_timer_rate - original value */
-#else
-	0x1E, 0x03, /* for test : force time upate*/
-#endif
+	0x1E, 0x03, /* s6e3ha9_timer_rate */
 };
 static DEFINE_PKTUI(s6e3ha9_aod_timer_rate, &s6e3ha9_aod_maptbl[SET_TIME_RATE], 0);
 static DEFINE_VARIABLE_PACKET(s6e3ha9_aod_timer_rate, DSI_PKT_TYPE_WR, S6E3HA9_AOD_TIMER_RATE, 6);

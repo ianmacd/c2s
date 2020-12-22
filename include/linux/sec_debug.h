@@ -232,6 +232,12 @@ extern void secdbg_base_set_task_in_sync_irq(uint64_t task, unsigned int irq, co
 #define secdbg_base_set_task_in_sync_irq(a, b, c, d)	do { } while (0)
 #endif /* CONFIG_SEC_DEBUG_PM_DEVICE_INFO */
 
+#ifdef CONFIG_SEC_DEBUG_SHOW_USER_STACK
+extern void secdbg_send_sig_debuggerd(struct task_struct *p, int opt);
+#else
+#define secdbg_send_sig_debuggerd(a, b)		do { } while (0)
+#endif
+
 #ifdef CONFIG_SEC_DEBUG
 #define SDBG_KNAME_LEN	64
 

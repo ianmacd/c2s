@@ -269,7 +269,6 @@ struct domain_fn cpu_fn = {
  *			Gathering CPUFreq Information			*
  ************************************************************************/
 #define ARMV8_PMU_CCNT_IDX 31
-
 static void cpupro_update_pmuevent(int cpu,
 	struct cpu_profiler *cpupro, int new_cstate, int freq_idx)
 {
@@ -436,7 +435,6 @@ void cpupro_set_dom_profile(struct domain_profiler *dompro, int enabled)
 		return;
 
 	policy = cpufreq_cpu_get(cpumask_first(&dompro->online_cpus));
-
 	if (policy) {
 		/* update current freq idx */
 		dompro->cur_freq_idx = get_idx_from_freq(dompro->table, dompro->table_cnt,

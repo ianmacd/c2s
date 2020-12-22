@@ -2018,3 +2018,29 @@ config RAVE_SP_CORE
 
 endmenu
 endif
+
+config CS35L41_TABLES_TEST
+	bool "KUnit test for cs35l41_tables_test"
+	depends on KUNIT
+	help
+	  TODO: Describe config fully.
+
+config CIRRUS_BD_TEST
+	bool "KUnit test for cirrus_bd_test"
+	depends on KUNIT
+	help
+	  TODO: Describe config fully.
+
+
+config CIRRUS_CAL_TEST
+	bool "KUnit test for cirrus_cal_test"
+	depends on KUNIT
+	help
+	  TODO: Describe config fully.
+
+
+config CIRRUS_PWR_TEST
+	bool "KUnit test for cirrus_pwr_test"
+	depends on KUNIT
+	help
+	  TODO: Describe config fully.

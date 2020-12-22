@@ -725,7 +725,7 @@ static int update_policy(struct eye *eye)
 	return updated;
 }
 
-static void update_eye(struct sauron *sauron, struct eye *eye)
+__visible_for_testing void update_eye(struct sauron *sauron, struct eye *eye)
 {
 	eye->value++;
 	eye->t_stamp = jiffies;
@@ -740,6 +740,7 @@ static void update_eye(struct sauron *sauron, struct eye *eye)
 		update_heavy_and_light(sauron, eye);
 	} else {
 		del_monitor_flow(sauron, eye);
+		remove_heavy_and_light(sauron, eye);
 	}
 	sauron_unlock(sauron);
 	return;

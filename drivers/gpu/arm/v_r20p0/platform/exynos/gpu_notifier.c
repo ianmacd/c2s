@@ -397,9 +397,9 @@ static void pm_callback_runtime_off(struct kbase_device *kbdev)
 	platform->restore_clock = platform->cur_clock;
 
 	gpu_dvfs_stop_env_data_gathering(kbdev);
-
+#ifdef CONFIG_MALI_TSG
 	gpu_tsg_reset_count(0);
-
+#endif
 #ifdef CONFIG_MALI_DVFS
 	gpu_dvfs_timer_control(false);
 

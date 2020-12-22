@@ -90,7 +90,10 @@ static int jd_run_atom(struct kbase_jd_atom *katom)
 
 	if ((katom->core_req & BASE_JD_REQ_ATOM_TYPE) == BASE_JD_REQ_DEP) {
 		/* Dependency only atom */
+		/* MALI_SEC_INTEGRATION */
+#ifdef CONFIG_MALI_TSG
 		gpu_tsg_set_count(katom, katom->core_req, KBASE_JD_ATOM_STATE_COMPLETED, false);
+#endif
 		katom->status = KBASE_JD_ATOM_STATE_COMPLETED;
 		kbase_kinstr_jm_atom_complete(katom);
 		return 0;
@@ -98,22 +101,31 @@ static int jd_run_atom(struct kbase_jd_atom *katom)
 		/* Soft-job */
 		if (katom->will_fail_event_code) {
 			kbase_finish_soft_job(katom);
+			/* MALI_SEC_INTEGRATION */
+#ifdef CONFIG_MALI_TSG
 			gpu_tsg_set_count(katom, katom->core_req, KBASE_JD_ATOM_STATE_COMPLETED, false);
+#endif
 			katom->status = KBASE_JD_ATOM_STATE_COMPLETED;
 			kbase_kinstr_jm_atom_complete(katom);
 			return 0;
 		}
 		if (kbase_process_soft_job(katom) == 0) {
 			kbase_finish_soft_job(katom);
+			/* MALI_SEC_INTEGRATION */
+#ifdef CONFIG_MALI_TSG
 			gpu_tsg_set_count(katom, katom->core_req, KBASE_JD_ATOM_STATE_COMPLETED, false);
+#endif
 			katom->status = KBASE_JD_ATOM_STATE_COMPLETED;
 			kbase_kinstr_jm_atom_complete(katom);
 		}
 		return 0;
 	}
 
+/* MALI_SEC_INTEGRATION */
+#ifdef CONFIG_MALI_TSG
 	if (katom->status != KBASE_JD_ATOM_STATE_IN_JS)
 		gpu_tsg_set_count(katom, katom->core_req, KBASE_JD_ATOM_STATE_IN_JS, false);
+#endif
 	katom->status = KBASE_JD_ATOM_STATE_IN_JS;
 	/* Queue an action about whether we should try scheduling a context */
 	return kbasep_js_add_job(kctx, katom);
@@ -595,8 +607,10 @@ bool jd_done_nolock(struct kbase_jd_atom *katom,
 			katom->atom_flags = katom->atom_flags & (~KBASE_KATOM_FLAG_BEEN_SOFT_STOPPPED);
 		}
 	}
-
+	/* MALI_SEC_INTEGRATION */
+#ifdef CONFIG_MALI_TSG
 	gpu_tsg_set_count(katom, katom->core_req, KBASE_JD_ATOM_STATE_COMPLETED, false);
+#endif
 	katom->status = KBASE_JD_ATOM_STATE_COMPLETED;
 	kbase_kinstr_jm_atom_complete(katom);
 	list_add_tail(&katom->jd_item, &completed_jobs);
@@ -634,7 +648,10 @@ bool jd_done_nolock(struct kbase_jd_atom *katom,
 					WARN_ON(!list_empty(&node->queue));
 					kbase_finish_soft_job(node);
 				}
+				/* MALI_SEC_INTEGRATION */
+#ifdef CONFIG_MALI_TSG
 				gpu_tsg_set_count(node, node->core_req, KBASE_JD_ATOM_STATE_COMPLETED, false);
+#endif
 				node->status = KBASE_JD_ATOM_STATE_COMPLETED;
 			}
 
@@ -768,6 +785,13 @@ bool jd_submit_atom(struct kbase_context *kctx, const struct base_jd_atom_v2 *us
 
 	katom->age = kctx->age_count++;
 
+	if (!(katom->core_req & BASE_JD_REQ_SOFT_JOB)) {
+		if (!kbase_js_is_atom_valid(kctx->kbdev, katom)) {
+			katom->event_code = BASE_JD_EVENT_JOB_INVALID;
+			return jd_done_nolock(katom, NULL);
+		}
+	}
+
 	INIT_LIST_HEAD(&katom->queue);
 	INIT_LIST_HEAD(&katom->jd_item);
 #ifdef CONFIG_MALI_DMA_FENCE
@@ -787,7 +811,10 @@ bool jd_submit_atom(struct kbase_context *kctx, const struct base_jd_atom_v2 *us
 			if (dep_atom_type != BASE_JD_DEP_TYPE_ORDER &&
 					dep_atom_type != BASE_JD_DEP_TYPE_DATA) {
 				katom->event_code = BASE_JD_EVENT_JOB_CONFIG_FAULT;
+				/* MALI_SEC_INTEGRATION */
+#ifdef CONFIG_MALI_TSG
 				gpu_tsg_set_count(katom, katom->core_req, KBASE_JD_ATOM_STATE_COMPLETED, false);
+#endif
 				katom->status = KBASE_JD_ATOM_STATE_COMPLETED;
 
 				/* Wrong dependency setup. Atom will be sent
@@ -840,8 +867,11 @@ bool jd_submit_atom(struct kbase_context *kctx, const struct base_jd_atom_v2 *us
 
 			/* Atom has completed, propagate the error code if any */
 			katom->event_code = dep_atom->event_code;
+			/* MALI_SEC_INTEGRATION */
+#ifdef CONFIG_MALI_TSG
 			if (katom->status != KBASE_JD_ATOM_STATE_QUEUED)
 				gpu_tsg_set_count(katom, katom->core_req, KBASE_JD_ATOM_STATE_QUEUED, false);
+#endif
 			katom->status = KBASE_JD_ATOM_STATE_QUEUED;
 
 			/* This atom will be sent back to user space.
@@ -907,8 +937,11 @@ bool jd_submit_atom(struct kbase_context *kctx, const struct base_jd_atom_v2 *us
 		 * that depends on a previous atom with the same number behaves
 		 * as expected */
 		katom->event_code = BASE_JD_EVENT_DONE;
-	if (katom->status != KBASE_JD_ATOM_STATE_QUEUED)
-		gpu_tsg_set_count(katom, katom->core_req, KBASE_JD_ATOM_STATE_QUEUED, false);
+/* MALI_SEC_INTEGRATION */
+#ifdef CONFIG_MALI_TSG
+		if (katom->status != KBASE_JD_ATOM_STATE_QUEUED)
+			gpu_tsg_set_count(katom, katom->core_req, KBASE_JD_ATOM_STATE_QUEUED, false);
+#endif
 		katom->status = KBASE_JD_ATOM_STATE_QUEUED;
 	}
 
@@ -1029,8 +1062,11 @@ bool jd_submit_atom(struct kbase_context *kctx, const struct base_jd_atom_v2 *us
 
 		ret = false;
 	} else if ((katom->core_req & BASE_JD_REQ_ATOM_TYPE) != BASE_JD_REQ_DEP) {
+		/* MALI_SEC_INTEGRATION */
+#ifdef CONFIG_MALI_TSG
 		if (katom->status == KBASE_JD_ATOM_STATE_QUEUED)
 			gpu_tsg_set_count(katom, katom->core_req, KBASE_JD_ATOM_STATE_IN_JS, false);
+#endif
 		katom->status = KBASE_JD_ATOM_STATE_IN_JS;
 		ret = kbasep_js_add_job(kctx, katom);
 		/* If job was cancelled then resolve immediately */
@@ -1207,9 +1243,11 @@ void kbase_jd_done_worker(struct work_struct *data)
 		mutex_unlock(&js_devdata->queue_mutex);
 
 		spin_lock_irqsave(&kbdev->hwaccess_lock, flags);
-
+		/* MALI_SEC_INTEGRATION */
+#ifdef CONFIG_MALI_TSG
 		if (katom->status != KBASE_JD_ATOM_STATE_IN_JS)
 			gpu_tsg_set_count(katom, katom->core_req, KBASE_JD_ATOM_STATE_IN_JS, false);
+#endif
 		katom->status = KBASE_JD_ATOM_STATE_IN_JS;
 		kbase_js_unpull(kctx, katom);
 

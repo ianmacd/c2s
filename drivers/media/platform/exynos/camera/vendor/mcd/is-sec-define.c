@@ -1027,6 +1027,26 @@ int is_sec_parse_rom_info(struct is_rom_info *finfo, char *buf, int rom_id)
 			memcpy(ois_pinfo->tele_supperssion_yratio, &buf[finfo->rom_ois_list[12]], IS_OIS_SUPPERSSION_RATIO_DATA_SIZE);
 			memcpy(ois_pinfo->tele_cal_mark, &buf[finfo->rom_ois_list[13]], IS_OIS_CAL_MARK_DATA_SIZE);
 		}
+	 } else if (finfo->rom_ois_list_len == IS_ROM_OIS_SINGLE_MODULE_MAX_LIST) {
+		is_sec_get_ois_pinfo(&ois_pinfo);
+
+		if (rom_id == ROM_ID_REAR) {
+			memcpy(ois_pinfo->wide_xgg, &buf[finfo->rom_ois_list[0]], IS_OIS_GYRO_DATA_SIZE);
+			memcpy(ois_pinfo->wide_ygg, &buf[finfo->rom_ois_list[1]], IS_OIS_GYRO_DATA_SIZE);
+			memcpy(ois_pinfo->wide_xcoef, &buf[finfo->rom_ois_list[2]], IS_OIS_COEF_DATA_SIZE);
+			memcpy(ois_pinfo->wide_ycoef, &buf[finfo->rom_ois_list[3]], IS_OIS_COEF_DATA_SIZE);
+			memcpy(ois_pinfo->wide_supperssion_xratio, &buf[finfo->rom_ois_list[4]], IS_OIS_SUPPERSSION_RATIO_DATA_SIZE);
+			memcpy(ois_pinfo->wide_supperssion_yratio, &buf[finfo->rom_ois_list[5]], IS_OIS_SUPPERSSION_RATIO_DATA_SIZE);
+			memcpy(ois_pinfo->wide_cal_mark, &buf[finfo->rom_ois_list[6]], IS_OIS_CAL_MARK_DATA_SIZE);
+		} else if (rom_id == ROM_ID_REAR3) {
+			memcpy(ois_pinfo->tele_xgg, &buf[finfo->rom_ois_list[0]], IS_OIS_GYRO_DATA_SIZE);
+			memcpy(ois_pinfo->tele_ygg, &buf[finfo->rom_ois_list[1]], IS_OIS_GYRO_DATA_SIZE);
+			memcpy(ois_pinfo->tele_xcoef, &buf[finfo->rom_ois_list[2]], IS_OIS_COEF_DATA_SIZE);
+			memcpy(ois_pinfo->tele_ycoef, &buf[finfo->rom_ois_list[3]], IS_OIS_COEF_DATA_SIZE);
+			memcpy(ois_pinfo->tele_supperssion_xratio, &buf[finfo->rom_ois_list[4]], IS_OIS_SUPPERSSION_RATIO_DATA_SIZE);
+			memcpy(ois_pinfo->tele_supperssion_yratio, &buf[finfo->rom_ois_list[5]], IS_OIS_SUPPERSSION_RATIO_DATA_SIZE);
+			memcpy(ois_pinfo->tele_cal_mark, &buf[finfo->rom_ois_list[6]], IS_OIS_CAL_MARK_DATA_SIZE);
+		}
 	}
 #endif
 

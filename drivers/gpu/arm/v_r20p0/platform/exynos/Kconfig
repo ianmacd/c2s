@@ -153,6 +153,13 @@ config MALI_DYNAMIC_IFPO
 	help
 		Choose this option to enable dynamic IFPO Option to set threshold value to control ifpo in the Mali tTRx DDK.
 
+config MALI_TSG
+	bool "Enable Sustainable optimize"
+	depends on MALI_MIDGARD && MALI_RT_PM && MALI_DVFS
+	default y
+	help
+		Choose this option to enable integrated samsung governor in the Mali tTRx DDK.
+
 config MALI_CL_PMQOS
 	bool "Enable CL PMQOS Table Option"
 	depends on MALI_MIDGARD && MALI_RT_PM && MALI_DVFS && MALI_PM_QOS

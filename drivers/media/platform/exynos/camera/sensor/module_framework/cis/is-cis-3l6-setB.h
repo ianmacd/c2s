@@ -407,4 +407,16 @@ static const struct sensor_pll_info_compact *sensor_3l6_pllinfos_B[] = {
 	&sensor_3l6_pllinfo_B_992x744_120fps,
 };
 
+const u32 sensor_3l6_dualsync_slave_on_B[] = {
+	0x3F00 ,0x0500, 0x02,
+	0x3C68, 0x0400, 0x02,
+	0x3F04, 0x005A, 0x02,
+};
+
+const u32 sensor_3l6_dualsync_slave_off_B[] = {
+	0x3F00 ,0x0000, 0x02,
+	0x3C68, 0x0000, 0x02,
+	0x3F04, 0x0000, 0x02,
+};
+
 #endif

@@ -89,6 +89,7 @@ int cp_get_log_dump(struct io_device *iod, struct link_device *ld, unsigned long
 		mif_err("copy_from_user() error:%d\n", ret);
 		return ret;
 	}
+	log_dump.name[sizeof(log_dump.name) - 1] = '\0';
 	mif_info("%s log name:%s index:%d\n", iod->name, log_dump.name, log_dump.idx);
 
 	cp_num = ld->mdm_data->cp_num;

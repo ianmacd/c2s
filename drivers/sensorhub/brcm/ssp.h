@@ -135,6 +135,8 @@
  // this packet size related when AP send ssp packet to MCU.
 #define MAX_SSP_PACKET_SIZE	1000
 #define SSP_INSTRUCTION_PACKET  9
+//camera moving filter
+#define CAM_LUX_INITIAL -1
 
 #define SSP_DEBUG_TIME_FLAG_ON		"SSP:DEBUG_TIME=1"
 #define SSP_DEBUG_TIME_FLAG_OFF		"SSP:DEBUG_TIME=0"
@@ -342,6 +344,7 @@ enum {
 #define GYROSCOPE_DPS_FACTORY	0x8B
 #define MCU_FACTORY		0x8C
 #define MCU_SLEEP_FACTORY		0x8D
+#define MSG2SSP_PANEL_INFORMATION	0x91
 
 /* Factory data length */
 #define ACCEL_FACTORY_DATA_LENGTH		1
@@ -1045,6 +1048,14 @@ struct ssp_data {
 	bool hall_ic_status; // 0: open 1: close
 	bool svc_octa_change; // default, false;
 	int prox_call_min; // default: -1
+/* moving average filter buffer for sABC algorithm */
+#if defined(CONFIG_SENSORS_SABC)
+	int brightness;
+	int last_brightness_level;
+	bool camera_lux_en;
+	int camera_lux;	
+	int pre_camera_lux; 
+#endif
 };
 
 //#if defined (CONFIG_SENSORS_SSP_VLTE)
@@ -1195,6 +1206,9 @@ void report_step_det_data(struct ssp_data *data, int sensor_type, struct sensor_
 void report_gesture_data(struct ssp_data *data, int sensor_type, struct sensor_value *gesdata);
 void report_pressure_data(struct ssp_data *data, int sensor_type, struct sensor_value *predata);
 void report_light_data(struct ssp_data *data, int sensor_type, struct sensor_value *lightdata);
+#if defined(CONFIG_SENSORS_SABC)
+void report_uncal_light_data(struct ssp_data *data,int sensor_type, struct sensor_value *lightdata);
+#endif
 #ifdef CONFIG_SENSORS_SSP_IRDATA_FOR_CAMERA
 void report_light_ir_data(struct ssp_data *data, int sensor_type, struct sensor_value *lightirdata);
 #endif
@@ -1308,8 +1322,9 @@ int set_prox_cal_to_ssp(struct ssp_data *data);
 int set_prox_dynamic_cal_to_ssp(struct ssp_data *data);
 int set_prox_call_min_to_ssp(struct ssp_data *data);
 int set_factory_binary_flag_to_ssp(struct ssp_data *data);
-
-
+#if defined(CONFIG_SENSORS_SABC)
+void set_light_brightness(struct ssp_data *data);
+#endif
 #ifdef CONFIG_PANEL_NOTIFY
 char get_copr_status(struct ssp_data *data);
 #endif

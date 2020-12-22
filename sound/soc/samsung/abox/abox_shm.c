@@ -60,3 +60,9 @@ void abox_shm_writeq(u64 value, unsigned int offset)
 {
 	WRITE_ONCE(*(u64 *)(shm_base + offset), value);
 }
+
+#ifdef CONFIG_SND_SOC_SAMSUNG_AUDIO
+#ifdef CONFIG_ABOX_SHM_TEST
+#include "./kunit_test/abox_shm_test.c"
+#endif
+#endif

@@ -425,7 +425,7 @@ static int panel_set_mdnie(struct panel_device *panel)
 	}
 
 	if (!IS_PANEL_ACTIVE(panel))
-		return 0;
+		return -EAGAIN;
 
 #ifdef CONFIG_SUPPORT_AFC
 	panel_info("do mdnie-seq (mode:%s, afc:%s)\n",
@@ -1256,6 +1256,7 @@ int mdnie_enable(struct mdnie_info *mdnie)
 {
 	struct panel_device *panel =
 		container_of(mdnie, struct panel_device, mdnie);
+	int ret;
 
 	if (IS_MDNIE_ENABLED(mdnie)) {
 		panel_info("mdnie already enabled\n");
@@ -1268,12 +1269,15 @@ int mdnie_enable(struct mdnie_info *mdnie)
 	if (IS_HBM_MODE(mdnie))
 		mdnie->props.trans_mode = TRANS_ON;
 	mutex_unlock(&mdnie->lock);
-	panel_mdnie_update(panel);
+	ret = panel_mdnie_update(panel);
+	if (ret < 0)
+		mdnie->props.enable = 0;
+
 	mutex_lock(&mdnie->lock);
 	mdnie->props.trans_mode = TRANS_ON;
 	mutex_unlock(&mdnie->lock);
 
-	panel_info("done\n");
+	panel_info("done %u\n", mdnie->props.enable);
 
 	return 0;
 }

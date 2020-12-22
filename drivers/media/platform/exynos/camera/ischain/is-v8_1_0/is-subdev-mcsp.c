@@ -449,6 +449,7 @@ static int is_ischain_mxp_start(struct is_device_ischain *device,
 #ifdef SOC_VRA
 	struct param_otf_input *otf_input = NULL;
 #endif
+	u32 flip = mcs_output->flip;
 	u32 crange;
 	u32 stripe_in_start_pos_x = 0;
 	u32 stripe_roi_start_pos_x = 0, stripe_roi_end_pos_x = 0;
@@ -464,6 +465,40 @@ static int is_ischain_mxp_start(struct is_device_ischain *device,
 	is_ischain_mxp_check_align(device, incrop, otcrop);
 	incrop_cfg = *incrop;
 	otcrop_cfg = *otcrop;
+
+	if (node->pixelformat && format->pixelformat != node->pixelformat) { /* per-frame control for RGB */
+		tmp_format = is_find_format((u32)node->pixelformat, 0);
+		if (tmp_format) {
+			mdbg_pframe("pixelformat is changed(%c%c%c%c->%c%c%c%c)\n",
+				device, subdev, frame,
+				(char)((format->pixelformat >> 0) & 0xFF),
+				(char)((format->pixelformat >> 8) & 0xFF),
+				(char)((format->pixelformat >> 16) & 0xFF),
+				(char)((format->pixelformat >> 24) & 0xFF),
+				(char)((tmp_format->pixelformat >> 0) & 0xFF),
+				(char)((tmp_format->pixelformat >> 8) & 0xFF),
+				(char)((tmp_format->pixelformat >> 16) & 0xFF),
+				(char)((tmp_format->pixelformat >> 24) & 0xFF));
+			queue->framecfg.format = format = tmp_format;
+		} else {
+			mdbg_pframe("pixelformat is not found(%c%c%c%c)\n",
+				device, subdev, frame,
+				(char)((node->pixelformat >> 0) & 0xFF),
+				(char)((node->pixelformat >> 8) & 0xFF),
+				(char)((node->pixelformat >> 16) & 0xFF),
+				(char)((node->pixelformat >> 24) & 0xFF));
+		}
+	}
+
+	if ((index >= PARAM_MCS_OUTPUT0 && index < PARAM_MCS_OUTPUT5) &&
+		frame->shot_ext->mcsc_flip[index - PARAM_MCS_OUTPUT0] != mcs_output->flip) {
+		flip = frame->shot_ext->mcsc_flip[index - PARAM_MCS_OUTPUT0];
+		queue->framecfg.flip = flip << 1;
+		mdbg_pframe("flip is changed(%d->%d)\n",
+			device, subdev, frame,
+			mcs_output->flip,
+			flip);
+	}
 
 	if (IS_ENABLED(CHAIN_USE_STRIPE_PROCESSING) && frame && frame->stripe_info.region_num) {
 		stripe_ret = is_ischain_mxp_stripe_cfg(subdev, frame,
@@ -501,30 +536,6 @@ static int is_ischain_mxp_start(struct is_device_ischain *device,
 			mdbg_pframe("CRange:N\n", device, subdev, frame);
 	}
 
-	if (node->pixelformat && format->pixelformat != node->pixelformat) { /* per-frame control for RGB */
-		tmp_format = is_find_format((u32)node->pixelformat, 0);
-		if (tmp_format) {
-			mdbg_pframe("pixelformat is changed(%c%c%c%c->%c%c%c%c)\n",
-				device, subdev, frame,
-				(char)((format->pixelformat >> 0) & 0xFF),
-				(char)((format->pixelformat >> 8) & 0xFF),
-				(char)((format->pixelformat >> 16) & 0xFF),
-				(char)((format->pixelformat >> 24) & 0xFF),
-				(char)((tmp_format->pixelformat >> 0) & 0xFF),
-				(char)((tmp_format->pixelformat >> 8) & 0xFF),
-				(char)((tmp_format->pixelformat >> 16) & 0xFF),
-				(char)((tmp_format->pixelformat >> 24) & 0xFF));
-			queue->framecfg.format = format = tmp_format;
-		} else {
-			mdbg_pframe("pixelformat is not found(%c%c%c%c)\n",
-				device, subdev, frame,
-				(char)((node->pixelformat >> 0) & 0xFF),
-				(char)((node->pixelformat >> 8) & 0xFF),
-				(char)((node->pixelformat >> 16) & 0xFF),
-				(char)((node->pixelformat >> 24) & 0xFF));
-		}
-	}
-
 	mcs_output->otf_format = OTF_OUTPUT_FORMAT_YUV422;
 	mcs_output->otf_bitwidth = OTF_OUTPUT_BIT_WIDTH_8BIT;
 	mcs_output->otf_order = OTF_OUTPUT_ORDER_BAYER_GR_BG;
@@ -558,7 +569,7 @@ static int is_ischain_mxp_start(struct is_device_ischain *device,
 					queue->framecfg.bytesperline[1]), 16);
 
 	mcs_output->yuv_range = crange;
-	mcs_output->flip = (u32)queue->framecfg.flip >> 1; /* Caution: change from bitwise to enum */
+	mcs_output->flip = flip;
 
 #ifdef ENABLE_HWFC
 	if (test_bit(IS_ISCHAIN_REPROCESSING, &device->state))
@@ -696,6 +707,7 @@ static int is_ischain_mxp_tag(struct is_subdev *subdev,
 	u32 index, lindex, hindex, indexes;
 	u32 pixelformat = 0;
 	u32 *target_addr;
+	bool change_flip = false;
 	bool change_pixelformat = false;
 
 	device = (struct is_device_ischain *)device_data;
@@ -771,6 +783,10 @@ static int is_ischain_mxp_tag(struct is_subdev *subdev,
 			pixelformat = node->pixelformat;
 		}
 
+		if ((index >= PARAM_MCS_OUTPUT0 && index < PARAM_MCS_OUTPUT5) &&
+			ldr_frame->shot_ext->mcsc_flip[index - PARAM_MCS_OUTPUT0] != mcs_output->flip)
+			change_flip = true;
+
 		inparm.x = mcs_output->crop_offset_x;
 		inparm.y = mcs_output->crop_offset_y;
 		inparm.w = mcs_output->crop_width;
@@ -790,6 +806,7 @@ static int is_ischain_mxp_tag(struct is_subdev *subdev,
 		if (!COMPARE_CROP(incrop, &inparm) ||
 			!COMPARE_CROP(otcrop, &otparm) ||
 			CHECK_STRIPE_CFG(&ldr_frame->stripe_info) ||
+			change_flip ||
 			change_pixelformat ||
 			!test_bit(IS_SUBDEV_RUN, &subdev->state) ||
 			test_bit(IS_SUBDEV_FORCE_SET, &leader->state)) {

@@ -103,7 +103,11 @@ static void get_timestamp(struct ssp_data *data, char *pchRcvDataFrame,
 	u16 ts_flag = 0;
 	u16 ts_cnt = 5;
 
+#ifdef CONFIG_SENSORS_SSP_PICASSO
+	if (data->IsVDIS_Enabled == true && sensor_type == GYROSCOPE_SENSOR) {
+#else
 	if (msg_inst == MSG2AP_INST_VDIS_DATA) {
+#endif
 		u64 prev_index = 0;
 
 		memcpy(&ts_index, pchRcvDataFrame + *iDataIdx, 4);
@@ -1043,7 +1047,11 @@ void initialize_function_pointer(struct ssp_data *data)
 	data->report_sensor_data[GRIP_SENSOR] = report_grip_data;
 #endif
 	data->report_sensor_data[LIGHT_SENSOR] = report_light_data;
+#if defined(CONFIG_SENSORS_SABC)
+	data->report_sensor_data[UNCAL_LIGHT_SENSOR] = report_uncal_light_data;
+#else
 	data->report_sensor_data[UNCAL_LIGHT_SENSOR] = report_light_data;
+#endif
 #ifdef CONFIG_SENSORS_SSP_IRDATA_FOR_CAMERA
 	data->report_sensor_data[LIGHT_IR_SENSOR] = report_light_ir_data;
 #endif

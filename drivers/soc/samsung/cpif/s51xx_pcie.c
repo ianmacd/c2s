@@ -130,6 +130,7 @@ inline int s51xx_pcie_send_doorbell_int(struct pci_dev *pdev, int int_num)
 		return 0;
 	}
 
+
 	if (s51xx_check_pcie_link_status(s51xx_pcie->pcie_channel_num) == 0) {
 		mif_err_limited("Can't send Interrupt(not linked)!!!\n");
 		goto check_cpl_timeout;
@@ -203,7 +204,6 @@ check_cpl_timeout:
 		return 0;
 	}
 
-	exynos_pcie_rc_register_dump(s51xx_pcie->pcie_channel_num);
 	return -EAGAIN;
 }
 

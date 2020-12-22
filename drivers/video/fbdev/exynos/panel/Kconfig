@@ -161,7 +161,7 @@ config PANEL_DISPLAY_MODE
 
 config PANEL_VRR_BRIDGE
 	tristate "Support panel vrr bridge"
-	depends on EXYNOS_DECON_LCD
+	depends on EXYNOS_DECON_LCD && PANEL_DISPLAY_MODE
 	default n
 
 config SUPPORT_FAST_DISCHARGE
@@ -186,6 +186,16 @@ config SUPPORT_MASK_LAYER
 
 config SUPPORT_ERRFG_RECOVERY
 	tristate "Support ERRFG recovery"
+	depends on EXYNOS_DECON_LCD
+	default n
+
+config PANEL_DECON_BOARD
+	tristate "Support decon board"
+	depends on EXYNOS_DECON_LCD
+	default n
+
+config PANEL_MAGNA_DDI
+	tristate "Support magna ddi"
 	depends on EXYNOS_DECON_LCD
 	default n
 

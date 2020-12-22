@@ -194,8 +194,8 @@ int find_energy_cpu(struct tp_env *env)
 
 	/* find energy cpu */
 	for_each_cpu(cpu, &candidates) {
-		int cpu_util;
 		unsigned int energy;
+		int cpu_util = env->cpu_util_with[cpu];
 		int idle_idx = idle_get_state_idx(cpu_rq(cpu));
 
 		/* calculate system energy */
@@ -208,7 +208,6 @@ int find_energy_cpu(struct tp_env *env)
 			continue;
 
 		/* 2. find min_util cpu when energy is same */
-		cpu_util = env->cpu_util_with[cpu];
 		if (cpu_util < min_util)
 			goto energy_cpu_found;
 		if (cpu_util > min_util)

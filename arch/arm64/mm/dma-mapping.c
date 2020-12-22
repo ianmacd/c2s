@@ -401,8 +401,7 @@ static uint32_t refer_table[131200] = {0};//0~32800, 32801~131200
 uint64_t exynos_pcie_set_dev_stage2_ap(const char *s2mpu_name, uint32_t vid, uint64_t base,
 		uint64_t size, enum stage2_ap ap)
 {
-	int i;
-	uint64_t start_idx, num;
+	uint64_t start_idx, num, i;
 	uint64_t ret = 0;
 	unsigned long flags;
 
@@ -452,8 +451,7 @@ map_finish:
 uint64_t exynos_pcie_unset_dev_stage2_ap(const char *s2mpu_name, uint32_t vid, uint64_t base,
 		uint64_t size, enum stage2_ap ap)
 {
-	int i;
-	uint64_t start_idx, num;
+	uint64_t start_idx, num, i;
 	uint64_t ret = 0;
 	unsigned long flags;
 

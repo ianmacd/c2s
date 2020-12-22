@@ -47,8 +47,8 @@
 
 #define SENSOR_NAME "Hi847"
 
-#define POLL_TIME_MS 100
-#define STREAM_OFF_POLL_CNT 3
+#define POLL_TIME_MS 5
+#define STREAM_MAX_POLL_CNT 60
 
 static const struct v4l2_subdev_ops subdev_ops;
 
@@ -126,11 +126,14 @@ static void sensor_hi847_cis_data_calculation(const struct sensor_pll_info_compa
 
 int sensor_hi847_cis_check_rev(struct is_cis *cis)
 {
-#if 0
+#if SENSOR_HI847_OTP_READ
 	u32 ret = 0;
 	u8 rev1 = 0;
 	u8 rev2 = 0;
-	struct i2c_client *client;
+	struct device *dev = NULL;
+	struct i2c_client *client = NULL;
+	struct device_node *dnode = NULL;
+	int gpio_reset = 0;
 
 	FIMC_BUG(!cis);
 	FIMC_BUG(!cis->cis_data);
@@ -138,7 +141,13 @@ int sensor_hi847_cis_check_rev(struct is_cis *cis)
 	client = cis->client;
 	FIMC_BUG(!client);
 
-	probe_info("%s start\n", __func__);
+	dev = &client->dev;
+	FIMC_BUG(!dev);
+
+	dnode = dev->of_node;
+
+	/* OTP ROM Read Sequence : Hi-847_OTP Chip ID read guide_v3.0_20200630.pdf */
+	probe_info("%s otp rom read start\n", __func__);
 
 	I2C_MUTEX_LOCK(cis->i2c_lock);
 
@@ -186,6 +195,8 @@ int sensor_hi847_cis_check_rev(struct is_cis *cis)
 		err("sensor_hi847 otp address h setting fail!!!");
 		goto p_err;
 	}
+
+#if 1		// for only chip revision
 	ret = is_sensor_write8(client, 0x030B, 0x0C);
 	if (ret < 0) {
 		err("sensor_hi847 otp address l setting fail!!!");
@@ -209,6 +220,36 @@ int sensor_hi847_cis_check_rev(struct is_cis *cis)
 		err("sensor_hi847 read rev1 fail!!!");
 		goto p_err;
 	}
+#else	// for all chip info
+	ret = is_sensor_write8(client, 0x030B, 0x01);
+	if (ret < 0) {
+		err("sensor_hi847 otp address l setting fail!!!");
+		goto p_err;
+	}
+	ret = is_sensor_write8(client, 0x0302, 0x01);
+	if (ret < 0) {
+		err("sensor_hi847 continuos read enable setting fail!!!");
+		goto p_err;
+	}
+
+	{
+		int i = 0;
+		u8 read_val[13] = {0, };
+
+		for (i = 0; i < 13; i++) {
+			ret = is_sensor_read8(client, 0x0308, &read_val[i]);
+			if (ret < 0) {
+				err("sensor_hi847 otp read fail (%d)!\n", i);
+				goto p_err;
+			}
+
+			info("[%s] %d bit value = 0x%X\n", __func__, i, read_val[i]);
+		}
+
+		rev1 = read_val[11];
+		rev2 = read_val[12];
+	}
+#endif
 
 	/* OTP read off */
 	ret = is_sensor_write8(client, 0x0B00, 0x00);
@@ -224,7 +265,7 @@ int sensor_hi847_cis_check_rev(struct is_cis *cis)
 
 	usleep_range(10000, 10000);
 
-	ret = is_sensor_write8(client, 0x0260, 0x10);
+	ret = is_sensor_write8(client, 0x0260, 0x00);
 	if (ret < 0) {
 		err("sensor_hi847 otp mode enable setting fail!!!");
 		goto p_err;
@@ -240,9 +281,28 @@ int sensor_hi847_cis_check_rev(struct is_cis *cis)
 		goto p_err;
 	}
 
+	/* XSHUTDOWN RESET */
+	gpio_reset = of_get_named_gpio(dnode, "gpio_reset", 0);
+	if (!gpio_is_valid(gpio_reset)) {
+		err("failed to get PIN_RESET!!!");
+		goto p_err;
+	}
+
+	gpio_request_one(gpio_reset, GPIOF_OUT_INIT_HIGH, "HI847_XRESET_OUTPUT_HIGH");
+	if (ret < 0) {
+		err("sensor_hi847 gpio request high err\n");
+		ret = 0;
+	}
+
 	usleep_range(1000, 1000);
 
-	cis->cis_data->cis_rev = (((u16)rev1 << 8) & 0xFF00) + (rev2 & 0xFF);
+	gpio_set_value(gpio_reset, 0);
+	usleep_range(500, 500);
+	gpio_set_value(gpio_reset, 1);
+	usleep_range(200, 200);
+	gpio_free(gpio_reset);
+
+	cis->cis_data->cis_rev = (((u16)rev1 << 8) & 0xFF00) | (rev2 & 0xFF);
 	probe_info("[%s] chip revision = %#x\n", __func__, cis->cis_data->cis_rev);
 
 	cis->rev_flag = true;
@@ -253,7 +313,7 @@ p_err:
 #else
 	int ret = 0;
 	u8 rev1 = 0x00;
-	u8 rev2 = 0x00;
+	u8 rev2 = 0x10;
 
 	cis->cis_data->cis_rev = (((u16)rev1 << 8) & 0xFF00) + (rev2 & 0xFF);
 	probe_info("[%s] chip revision = %#x\n", __func__, cis->cis_data->cis_rev);
@@ -322,6 +382,8 @@ static void sensor_hi847_cis_set_paf_stat_enable(u32 mode, cis_shared_data *cis_
 	WARN_ON(!cis_data);
 
 #if SENSOR_HI847_PDAF_DISABLE
+	cis_data->is_data.paf_stat_enable = false;
+#else
 	switch (mode) {
 	case SENSOR_HI847_3264X2448_30FPS:
 	case SENSOR_HI847_3264X1836_30FPS:
@@ -331,46 +393,7 @@ static void sensor_hi847_cis_set_paf_stat_enable(u32 mode, cis_shared_data *cis_
 		cis_data->is_data.paf_stat_enable = false;
 		break;
 	}
-#else
-	cis_data->is_data.paf_stat_enable = false;
 #endif
-}
-
-int sensor_hi847_cis_enable_frame_cnt(struct i2c_client *client, bool enable)
-{
-	int ret = -1;
-	u16 frame_cnt_ctrl = 0;
-
-	FIMC_BUG(!client);
-
-	ret = is_sensor_read16(client, SENSOR_HI847_MIPI_TX_OP_MODE_ADDR, &frame_cnt_ctrl);
-	if (ret < 0) {
-		err("i2c transfer fail addr(%x) ret = %d\n", SENSOR_HI847_MIPI_TX_OP_MODE_ADDR, ret);
-		goto p_err;
-	}
-
-	if (enable == true) {
-		frame_cnt_ctrl |= (0x1 << 10);  //enable frame count
-		frame_cnt_ctrl &= ~(0x1 << 8); //frame count reset off
-	} else {
-		frame_cnt_ctrl &= ~(0x1 << 10); //disable frame count
-		frame_cnt_ctrl |= (0x1 << 8);  //frame count reset on
-	}
-
-	ret = is_sensor_write16(client, SENSOR_HI847_MIPI_TX_OP_MODE_ADDR, frame_cnt_ctrl);
-	if (ret < 0) {
-		err("i2c transfer fail addr(%x) ret = %d\n",	SENSOR_HI847_MIPI_TX_OP_MODE_ADDR, ret);
-	}
-
-	ret = is_sensor_read16(client, SENSOR_HI847_MIPI_TX_OP_MODE_ADDR, &frame_cnt_ctrl);
-	if (ret < 0) {
-		err("i2c transfer fail addr(%x) ret = %d\n",	SENSOR_HI847_MIPI_TX_OP_MODE_ADDR, ret);
-	} else {
-		probe_info("[%s] frame count control = %#x\n", __func__, frame_cnt_ctrl);
-	}
-
-p_err:
-	return ret;
 }
 
 /*************************************************
@@ -424,6 +447,11 @@ int sensor_hi847_cis_init(struct v4l2_subdev *subdev)
 	u32 setfile_index = 0;
 	cis_setting_info setinfo;
 
+	struct is_module_enum *module = NULL;
+	struct is_device_sensor_peri *sensor_peri = NULL;
+	struct is_sensor_cfg *cfg_table;
+	u32 cfgs, i;
+
 	setinfo.param = NULL;
 	setinfo.return_value = 0;
 
@@ -433,11 +461,16 @@ int sensor_hi847_cis_init(struct v4l2_subdev *subdev)
 	FIMC_BUG(!cis);
 	FIMC_BUG(!cis->cis_data);
 
-	memset(cis->cis_data, 0, sizeof(cis_shared_data));
+	sensor_peri = container_of(cis, struct is_device_sensor_peri, cis);
+	FIMC_BUG(!sensor_peri);
+	FIMC_BUG(!sensor_peri->module);
+	module = sensor_peri->module;
 
 	probe_info("[%s] Hi847 CIS init\n", __func__);
 
 	if (cis->rev_flag == false) {
+		memset(cis->cis_data, 0, sizeof(cis_shared_data));
+
 		ret = sensor_hi847_cis_check_rev(cis);
 		if (ret < 0) {
 			warn("sensor_hi847_check_rev is fail when cis init");
@@ -455,6 +488,13 @@ int sensor_hi847_cis_init(struct v4l2_subdev *subdev)
 		sensor_hi847_setfile_sizes = sensor_hi847_setfile_A_sizes_rev00;
 		sensor_hi847_pllinfos = sensor_hi847_pllinfos_A_rev00;
 		sensor_hi847_max_setfile_num = ARRAY_SIZE(sensor_hi847_setfiles_A_rev00);
+
+		cfg_table = module->cfg;
+		cfgs = module->cfgs;
+		for (i = 0; i < cfgs; i++) {
+			cfg_table[i].mipi_speed = sensor_hi847_rev00_mipirate[i];
+			probe_info("[%s] mode = %d, changed mipirate = %d\n", __func__, i, cfg_table[i].mipi_speed);
+		}
 	} else {
 		probe_info("[%s] CHIP REV is MP version !!!\n", __func__);
 	}
@@ -536,8 +576,8 @@ int sensor_hi847_cis_log_status(struct v4l2_subdev *subdev)
 	ret = is_sensor_read16(client, SENSOR_HI847_COARSE_INTEG_TIME_ADDR, &data16);
 	if (unlikely(!ret)) pr_info("[SEN:INFO]coarse_integration_time(0x%x)\n", data16);
 	else goto p_i2c_err;
-	ret = is_sensor_read16(client, SENSOR_HI847_ANALOG_GAIN_ADDR, &data16);
-	if (unlikely(!ret)) pr_info("[SEN:INFO]gain_code_global(0x%x)\n", data16);
+	ret = is_sensor_read8(client, SENSOR_HI847_ANALOG_GAIN_ADDR, &data8);
+	if (unlikely(!ret)) pr_info("[SEN:INFO]gain_code_global(0x%x)\n", data8);
 	else goto p_i2c_err;
 	ret = is_sensor_read16(client, SENSOR_HI847_DIGITAL_GAIN_GR_ADDR, &data16);
 	if (unlikely(!ret)) pr_info("[SEN:INFO]gain_code_global(0x%x)\n", data16);
@@ -743,7 +783,6 @@ int sensor_hi847_cis_stream_on(struct v4l2_subdev *subdev)
 	}
 #endif
 
-
 #if SENSOR_HI847_PDAF_DISABLE
 	is_sensor_write16(client, 0x0B04, 0x00FC);
 	is_sensor_write16(client, 0x1004, 0x2BB0);
@@ -757,11 +796,6 @@ int sensor_hi847_cis_stream_on(struct v4l2_subdev *subdev)
 		err("i2c transfer fail addr(%x) ret = %d\n",
 				SENSOR_HI847_STREAM_MODE_ADDR, ret);
 		goto p_i2c_err;
-	}
-
-	ret = sensor_hi847_cis_enable_frame_cnt(client, true);
-	if (ret < 0) {
-		err("%s: sensor_hi847_cis_enable_frame_cnt failed, err[%d]", __func__, ret);
 	}
 
 	cis_data->stream_on = true;
@@ -1197,9 +1231,8 @@ int sensor_hi847_cis_set_exposure_time(struct v4l2_subdev *subdev, struct ae_par
 	if (ret < 0)
 		goto p_i2c_err;
 
-	dbg_sensor(1, "[MOD:D:%d] %s, vt_pix_clk_khz (%llu), LLP(%d), FLL(%d), CIT(0x%#x)\n",
-		cis->id, __func__,	cis_data->sen_vsync_count,
-		vt_pix_clk_khz, line_length_pck, cis_data->frame_length_lines, coarse_int);
+	dbg_sensor(1, "[MOD:D:%d] %s, vt_pix_clk_khz (%llu), LLP(%d), FLL(%d), CIT(%d)\n",
+		cis->id, __func__, vt_pix_clk_khz, line_length_pck, cis_data->frame_length_lines, coarse_int);
 
 #ifdef DEBUG_SENSOR_TIME
 	do_gettimeofday(&end);
@@ -1245,7 +1278,7 @@ int sensor_hi847_cis_get_min_analog_gain(struct v4l2_subdev *subdev, u32 *min_ag
 	cis_data->min_analog_gain[1] = sensor_hi847_cis_calc_again_permile(min_again_code);
 	*min_again = cis_data->min_analog_gain[1];
 
-	dbg_sensor(1, "[%s] min_again_code(0x%#x), main_again_permile(%d)\n", __func__,
+	dbg_sensor(1, "[%s] min_again_code(0x%X), main_again_permile(%d)\n", __func__,
 		cis_data->min_analog_gain[0], cis_data->min_analog_gain[1]);
 
 #ifdef DEBUG_SENSOR_TIME
@@ -1282,7 +1315,7 @@ int sensor_hi847_cis_get_max_analog_gain(struct v4l2_subdev *subdev, u32 *max_ag
 	cis_data->max_analog_gain[1] = sensor_hi847_cis_calc_again_permile(max_again_code);
 	*max_again = cis_data->max_analog_gain[1];
 
-	dbg_sensor(1, "[%s] max_again_code(0x%#x), max_again_permile(%d)\n", __func__,
+	dbg_sensor(1, "[%s] max_again_code(0x%X), max_again_permile(%d)\n", __func__,
 		cis_data->max_analog_gain[0], cis_data->max_analog_gain[1]);
 
 #ifdef DEBUG_SENSOR_TIME
@@ -1364,13 +1397,13 @@ int sensor_hi847_cis_set_analog_gain(struct v4l2_subdev *subdev, struct ae_param
 	analog_gain = (u8)sensor_hi847_cis_calc_again_code(again->val);
 
 	if (analog_gain < cis->cis_data->min_analog_gain[0]) {
-		dbg_sensor(1, "[MOD:D:%d] %s, input again(0x%#x) is not proper, reset to min_analog_gain(0x%#x)\n",
+		dbg_sensor(1, "[MOD:D:%d] %s, input again(0x%X) is not proper, reset to min_analog_gain(0x%X)\n",
 			__func__, analog_gain, cis->cis_data->min_analog_gain[0]);
 		analog_gain = cis->cis_data->min_analog_gain[0];
 	}
 
 	if (analog_gain > cis->cis_data->max_analog_gain[0]) {
-		dbg_sensor(1, "[MOD:D:%d] %s, input again(0x%#x) is not proper, reset to max_analog_gain(0x%#x)\n",
+		dbg_sensor(1, "[MOD:D:%d] %s, input again(0x%X) is not proper, reset to max_analog_gain(0x%X)\n",
 			__func__, analog_gain, cis->cis_data->max_analog_gain[0]);
 		analog_gain = cis->cis_data->max_analog_gain[0];
 	}
@@ -1446,7 +1479,7 @@ int sensor_hi847_cis_get_analog_gain(struct v4l2_subdev *subdev, u32 *again)
 
 	*again = sensor_hi847_cis_calc_again_permile((u32)analog_gain);
 
-	dbg_sensor(1, "[MOD:D:%d] %s, cur_again permile(%d us), analog_gain code(0x%#x)\n",
+	dbg_sensor(1, "[MOD:D:%d] %s, cur_again permile(%d us), analog_gain code(0x%X)\n",
 		cis->id, __func__, *again, analog_gain);
 
 #ifdef DEBUG_SENSOR_TIME
@@ -1493,7 +1526,7 @@ int sensor_hi847_cis_get_min_digital_gain(struct v4l2_subdev *subdev, u32 *min_d
 
 	*min_dgain = cis_data->min_digital_gain[1];
 
-	dbg_sensor(1, "[%s] min_dgain_code(0x%#x), min_dgain_permile(%d)\n", __func__,
+	dbg_sensor(1, "[%s] min_dgain_code(0x%X), min_dgain_permile(%d)\n", __func__,
 		cis_data->min_digital_gain[0], cis_data->min_digital_gain[1]);
 
 #ifdef DEBUG_SENSOR_TIME
@@ -1582,7 +1615,7 @@ int sensor_hi847_cis_set_digital_gain(struct v4l2_subdev *subdev, struct ae_para
 		dgain_code = cis->cis_data->max_digital_gain[0];
 	}
 
-	dbg_sensor(1, "[MOD:D:%d] %s(vsync cnt = %d), input_dgain permile(%d), dgain_code(0x%#x)\n",
+	dbg_sensor(1, "[MOD:D:%d] %s(vsync cnt = %d), input_dgain permile(%d), dgain_code(0x%X)\n",
 			cis->id, __func__, cis->cis_data->sen_vsync_count, dgain->val, dgain_code);
 
 	I2C_MUTEX_LOCK(cis->i2c_lock);
@@ -1691,7 +1724,7 @@ int sensor_hi847_cis_wait_streamoff(struct v4l2_subdev *subdev)
 	struct is_cis *cis   = NULL;
 	struct i2c_client *client = NULL;
 	u32 wait_cnt = 0;
-	u16 cur_frame_value = 0;
+	u16 PLL_en = 0;
 
 	FIMC_BUG(!subdev);
 
@@ -1701,31 +1734,24 @@ int sensor_hi847_cis_wait_streamoff(struct v4l2_subdev *subdev)
 	client = cis->client;
 	FIMC_BUG(!client);
 
-	ret = is_sensor_read16(client, SENSOR_HI847_ISP_FRAME_CNT_ADDR, &cur_frame_value);
-	if (ret < 0) {
-		err("i2c transfer fail addr(%x) ret = %d\n",
-				SENSOR_HI847_ISP_FRAME_CNT_ADDR, ret);
-		goto p_err;
-	}
-
 	do {
-		u16 next_frame_value = 0;
-		ret = is_sensor_read16(client, SENSOR_HI847_ISP_FRAME_CNT_ADDR, &next_frame_value);
+		ret = is_sensor_read16(client, SENSOR_HI847_ISP_PLL_ENABLE_ADDR, &PLL_en);
 		if (ret < 0) {
 			err("i2c transfer fail addr(%x) ret = %d\n",
-					SENSOR_HI847_ISP_FRAME_CNT_ADDR, ret);
+					SENSOR_HI847_ISP_PLL_ENABLE_ADDR, ret);
 			goto p_err;
 		}
-		dbg_sensor(1, "%s: cur : %d, next : %d\n", __func__, cur_frame_value,
-				next_frame_value);
-		if (next_frame_value == cur_frame_value)
+
+		dbg_sensor(1, "%s: PLL_en 0x%x \n", __func__, PLL_en);
+		/* pll_bypass */
+		if (!(PLL_en & 0x0100))
 			break;
 
-		cur_frame_value = next_frame_value;
 		wait_cnt++;
-	} while (wait_cnt < STREAM_OFF_POLL_CNT);
+		msleep(POLL_TIME_MS);
+	} while (wait_cnt < STREAM_MAX_POLL_CNT);
 
-	if (wait_cnt < STREAM_OFF_POLL_CNT) {
+	if (wait_cnt < STREAM_MAX_POLL_CNT) {
 		info("%s: finished after %d ms\n", __func__,
 				(wait_cnt + 1) * POLL_TIME_MS);
 	} else {
@@ -1734,11 +1760,6 @@ int sensor_hi847_cis_wait_streamoff(struct v4l2_subdev *subdev)
 	}
 
 p_err:
-	ret = sensor_hi847_cis_enable_frame_cnt(client, false);
-	if (ret < 0) {
-		err("%s: sensor_hi847_cis_enable_frame_cnt failed\n", __func__);
-	}
-
 	return ret;
 }
 
@@ -1748,7 +1769,7 @@ int sensor_hi847_cis_wait_streamon(struct v4l2_subdev *subdev)
 	struct is_cis *cis   = NULL;
 	struct i2c_client *client = NULL;
 	u32 wait_cnt = 0;
-	u16 cur_frame_value = 0;
+	u16 PLL_en = 0;
 
 	FIMC_BUG(!subdev);
 
@@ -1760,45 +1781,26 @@ int sensor_hi847_cis_wait_streamon(struct v4l2_subdev *subdev)
 
 	probe_info("[%s] start\n", __func__);
 
-	ret = is_sensor_read16(client, SENSOR_HI847_ISP_FRAME_CNT_ADDR, &cur_frame_value);
-	if (ret < 0) {
-		err("i2c transfer fail addr(%x) ret = %d\n", SENSOR_HI847_ISP_FRAME_CNT_ADDR, ret);
-		goto p_err;
-	}
-
 	do {
-		u16 next_frame_value = 0;
-		ret = is_sensor_read16(client, SENSOR_HI847_ISP_FRAME_CNT_ADDR, &next_frame_value);
+		ret = is_sensor_read16(client, SENSOR_HI847_ISP_PLL_ENABLE_ADDR, &PLL_en);
 		if (ret < 0) {
-			err("i2c transfer fail addr(%x) ret = %d\n", SENSOR_HI847_ISP_FRAME_CNT_ADDR, ret);
+			err("i2c transfer fail addr(%x) ret = %d\n", SENSOR_HI847_ISP_PLL_ENABLE_ADDR, ret);
 			goto p_err;
 		}
-		dbg_sensor(1, "%s: cur : %d, next : %d\n", __func__, cur_frame_value, next_frame_value);
-		probe_info("[%s] cur: %d, next: %d\n", __func__, cur_frame_value, next_frame_value);
 
-		if (next_frame_value != cur_frame_value)
+		dbg_sensor(1, "%s: PLL_en 0x%x\n", __func__, PLL_en);
+		/* pll_enable */
+		if (PLL_en & 0x0100)
 			break;
 
-		cur_frame_value = next_frame_value;
 		wait_cnt++;
-	} while (wait_cnt < STREAM_OFF_POLL_CNT);
+		msleep(POLL_TIME_MS);
+	} while (wait_cnt < STREAM_MAX_POLL_CNT);
 
-	if (wait_cnt < STREAM_OFF_POLL_CNT) {
+	if (wait_cnt < STREAM_MAX_POLL_CNT) {
 		info("%s: finished after %d ms\n", __func__, (wait_cnt + 1) * POLL_TIME_MS);
 	} else {
 		warn("%s: finished : polling timeout occurred after %d ms\n", __func__, (wait_cnt + 1) * POLL_TIME_MS);
-	}
-
-	{
-		u16 en_ramp;
-
-		ret = is_sensor_read16(client, 0x0732, &en_ramp);
-		if (ret < 0) {
-			err("i2c error\n");
-			goto p_err;
-		}
-
-		probe_info("[%s] pll_clkgen_en_ramp = %#x\n", __func__, en_ramp);
 	}
 
 p_err:
@@ -1808,7 +1810,6 @@ p_err:
 
 void sensor_hi847_cis_data_calc(struct v4l2_subdev *subdev, u32 mode)
 {
-	int ret = 0;
 	struct is_cis *cis = NULL;
 
 	FIMC_BUG_VOID(!subdev);
@@ -1820,17 +1821,6 @@ void sensor_hi847_cis_data_calc(struct v4l2_subdev *subdev, u32 mode)
 	if (mode >= sensor_hi847_max_setfile_num) {
 		err("invalid mode(%d)!!", mode);
 		return;
-	}
-
-	/* If check_rev fail when cis_init, one more check_rev in mode_change */
-	if (cis->rev_flag == false) {
-		ret = sensor_hi847_cis_check_rev(cis);
-		if (ret < 0) {
-			err("sensor_hi847_check_rev is fail: ret(%d)", ret);
-			return;
-		}
-
-		cis->rev_flag = true;
 	}
 
 	sensor_hi847_cis_data_calculation(sensor_hi847_pllinfos[mode], cis->cis_data);

@@ -596,6 +596,7 @@ static int set_online(int event, int state)
 	union power_supply_propval val;
 	struct device_node *np_charger = NULL;
 	char *charger_name;
+	struct power_supply *psy_otg;
 
 	if (event == NOTIFY_EVENT_SMTD_EXT_CURRENT)
 		pr_info("request smartdock charging current = %s\n",
@@ -610,6 +611,12 @@ static int set_online(int event, int state)
 		return 0;
 	}
 
+	psy_otg = get_power_supply_by_name("otg");
+	if (!psy_otg) {
+		pr_err("%s: fail to get battery power_supply_otg\n", __func__);
+		return 0;
+	}
+
 	if (!of_property_read_string(np_charger, "battery,charger_name",
 				(char const **)&charger_name)) {
 		pr_info("%s: charger_name = %s\n", __func__, charger_name);
@@ -617,15 +624,22 @@ static int set_online(int event, int state)
 		pr_err("%s: failed to get the charger name\n", __func__);
 		return 0;
 	}
-	/* for KNOX DT charging */
-	pr_info("Knox Desktop connection state = %s\n", state ? "Connected" : "Disconnected");
-	if (state)
-		val.intval = SEC_BATTERY_CABLE_SMART_NOTG;
-	else
-		val.intval = SEC_BATTERY_CABLE_NONE;
 
-	psy_do_property("battery", set,
-			POWER_SUPPLY_PROP_ONLINE, val);
+	if (event == NOTIFY_EVENT_HMD_EXT_CURRENT) {
+		pr_info("HMD connection state = %s\n", state ? "Connected" : "Disconnected");
+		val.intval = state;
+		psy_otg->desc->set_property(psy_otg, POWER_SUPPLY_PROP_VOLTAGE_MAX, &val);
+	} else {
+		/* for KNOX DT charging */
+		pr_info("Knox Desktop connection state = %s\n", state ? "Connected" : "Disconnected");
+		if (state)
+			val.intval = SEC_BATTERY_CABLE_SMART_NOTG;
+		else
+			val.intval = SEC_BATTERY_CABLE_NONE;
+
+		psy_do_property("battery", set,
+				POWER_SUPPLY_PROP_ONLINE, val);
+	}
 
 	return 0;
 }

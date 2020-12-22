@@ -1010,17 +1010,26 @@ static int getidx_lpm_mode_table(struct maptbl *tbl)
 
 static int getidx_lpm_fps_table(struct maptbl *tbl)
 {
-	int row = 0, lpm_lfd_min_freq;
+	int row = LPM_LFD_1HZ, lpm_lfd_min_freq;
 	struct panel_device *panel;
 	struct panel_properties *props;
 	struct vrr_lfd_config *vrr_lfd_config;
+	struct vrr_lfd_status *vrr_lfd_status;
 
 	panel = (struct panel_device *)tbl->pdata;
 	props = &panel->panel_data.props;
 
+	vrr_lfd_status = &props->vrr_lfd_info.status[VRR_LFD_SCOPE_LPM];
+	vrr_lfd_status->lfd_max_freq = 30;
+	vrr_lfd_status->lfd_max_freq_div = 1;
+	vrr_lfd_status->lfd_min_freq = 1;
+	vrr_lfd_status->lfd_min_freq_div = 30;
+
 	vrr_lfd_config = &props->vrr_lfd_info.cur[VRR_LFD_SCOPE_LPM];
 	if (vrr_lfd_config->fix == VRR_LFD_FREQ_HIGH) {
 		row = LPM_LFD_30HZ;
+		vrr_lfd_status->lfd_min_freq = 30;
+		vrr_lfd_status->lfd_min_freq_div = 1;
 		panel_info("lpm_fps %dhz (row:%d)\n",
 				(row == LPM_LFD_1HZ) ? 1 : 30, row);
 		return maptbl_index(tbl, 0, row, 0);
@@ -1030,6 +1039,8 @@ static int getidx_lpm_fps_table(struct maptbl *tbl)
 		get_s6e3hac_lpm_lfd_min_freq(vrr_lfd_config->scalability);
 	if (lpm_lfd_min_freq <= 0 || lpm_lfd_min_freq > 1) {
 		row = LPM_LFD_30HZ;
+		vrr_lfd_status->lfd_min_freq = 30;
+		vrr_lfd_status->lfd_min_freq_div = 1;
 		panel_info("lpm_fps %dhz (row:%d)\n",
 				(row == LPM_LFD_1HZ) ? 1 : 30, row);
 		return maptbl_index(tbl, 0, row, 0);
@@ -1038,8 +1049,14 @@ static int getidx_lpm_fps_table(struct maptbl *tbl)
 #ifdef CONFIG_SUPPORT_DOZE
 	switch (props->lpm_fps) {
 	case LPM_LFD_1HZ:
+		row = props->lpm_fps;
+		vrr_lfd_status->lfd_min_freq = 1;
+		vrr_lfd_status->lfd_min_freq_div = 30;
+		break;
 	case LPM_LFD_30HZ:
 		row = props->lpm_fps;
+		vrr_lfd_status->lfd_min_freq = 30;
+		vrr_lfd_status->lfd_min_freq_div = 1;
 		break;
 	default:
 		panel_err("invalid lpm_fps %d\n",
@@ -1291,6 +1308,7 @@ static void copy_lfd_min_maptbl(struct maptbl *tbl, u8 *dst)
 	struct panel_info *panel_data = &panel->panel_data;
 	struct panel_properties *props = &panel_data->props;
 	struct vrr_lfd_config *vrr_lfd_config;
+	struct vrr_lfd_status *vrr_lfd_status;
 	struct panel_vrr *vrr;
 	int vrr_fps, vrr_mode;
 	u32 vrr_div_count;
@@ -1318,8 +1336,9 @@ static void copy_lfd_min_maptbl(struct maptbl *tbl, u8 *dst)
 	}
 
 	/* update lfd_min status */
-	props->vrr_lfd_info.lfd_min_freq_div = vrr_div_count;
-	props->vrr_lfd_info.lfd_min_freq =
+	vrr_lfd_status = &props->vrr_lfd_info.status[VRR_LFD_SCOPE_NORMAL];
+	vrr_lfd_status->lfd_min_freq_div = vrr_div_count;
+	vrr_lfd_status->lfd_min_freq =
 		disp_div_round(vrr_fps, vrr_div_count);
 
 	panel_dbg("vrr(%d %d) lfd(fix:%d scale:%d min:%d max:%d) --> lfd_min(1/%d)\n",
@@ -1337,6 +1356,7 @@ static void copy_lfd_max_maptbl(struct maptbl *tbl, u8 *dst)
 	struct panel_info *panel_data = &panel->panel_data;
 	struct panel_properties *props = &panel_data->props;
 	struct vrr_lfd_config *vrr_lfd_config;
+	struct vrr_lfd_status *vrr_lfd_status;
 	struct panel_vrr *vrr;
 	int vrr_fps, vrr_mode;
 	u32 vrr_div_count;
@@ -1364,8 +1384,9 @@ static void copy_lfd_max_maptbl(struct maptbl *tbl, u8 *dst)
 	}
 
 	/* update lfd_max status */
-	props->vrr_lfd_info.lfd_max_freq_div = vrr_div_count;
-	props->vrr_lfd_info.lfd_max_freq =
+	vrr_lfd_status = &props->vrr_lfd_info.status[VRR_LFD_SCOPE_NORMAL];
+	vrr_lfd_status->lfd_max_freq_div = vrr_div_count;
+	vrr_lfd_status->lfd_max_freq =
 		disp_div_round(vrr_fps, vrr_div_count);
 
 	panel_dbg("vrr(%d %d) lfd(fix:%d scale:%d min:%d max:%d) --> lfd_max(1/%d)\n",
@@ -2375,5 +2396,19 @@ static bool is_panel_state_not_lpm(struct panel_device *panel)
 		return true;
 
 	return false;
+}
+
+static bool is_brightdot_enabled(struct panel_device *panel)
+{
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+	if (panel->panel_data.props.brightdot_test_enable != 0)
+		return true;
+#endif
+	return false;
+}
+
+static inline bool is_brightdot_disabled(struct panel_device *panel)
+{
+	return !is_brightdot_enabled(panel);
 }
 

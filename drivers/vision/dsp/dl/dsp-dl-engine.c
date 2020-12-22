@@ -171,7 +171,11 @@ enum dsp_dl_status dsp_dl_init(struct dsp_dl_param *param)
 		return DSP_DL_FAIL;
 	}
 
-	__dsp_dl_init_common_lib();
+	ret = __dsp_dl_init_common_lib();
+	if (ret == -1) {
+		DL_ERROR("Common Lib initialize is failed\n");
+		return DSP_DL_FAIL;
+	}
 
 	return DSP_DL_SUCCESS;
 }

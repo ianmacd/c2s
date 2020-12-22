@@ -81,9 +81,17 @@ TEEC_Result tz_call(uint8_t* data, size_t len, unsigned long* mode)
  	}
 
 	sendmsg = kmalloc(sizeof(tciMessage_t), GFP_KERNEL);
+	if (sendmsg == NULL) {
+ 		hdm_info("%s sendmsg allocation failed\n", __func__);
+		goto out;
+	}
 	rspmsg = kmalloc(sizeof(tciMessage_t), GFP_KERNEL);
+	if (rspmsg == NULL) {
+ 		hdm_info("%s rspmsg allocation failed\n", __func__);
+		goto out;
+	}
 
-	sendmsg->jws_message.len = len;
+	sendmsg->jws_message.len = (uint32_t)len;
 	memcpy(sendmsg->jws_message.data, data, len);
 
 	hdm_info("%s sendmsg->jws_message.len = %d\n", __func__,
@@ -128,8 +136,10 @@ close_session:
 finalize_context:
 	TEEC_FinalizeContext(&context);
 out:
-	kfree(sendmsg);
-	kfree(rspmsg);
+	if(sendmsg)
+		kfree(sendmsg);
+	if(rspmsg)
+		kfree(rspmsg);
 	hdm_info("%s end, result=0x%x\n", __func__, result);
 
 	return result;
@@ -440,9 +450,6 @@ static ssize_t store_hdm_test(struct device *dev, struct device_attribute *attr,
 			case HDM_DEVICE_BLUETOOTH:
 				hdm_info("%s BT uh_call\n", __func__);
 				command = APP_HDM_EVENT_BLUETOOTH;
-				break;
-			default:
-				hdm_info("%s wrong cmd\n", __func__);
 				break;
 			}
 			uh_call(UH_APP_HDM, command, 0, 0, 0, 0);

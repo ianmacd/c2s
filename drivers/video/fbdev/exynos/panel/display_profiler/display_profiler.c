@@ -51,7 +51,7 @@ static const char *profiler_config_names[] = {
 	"mprint_debug",
 };
 
-static bool profiler_cmdlog_filter_list[PROFILER_CMDLOG_FILTER_SIZE + 1] = { false, };
+static bool profiler_cmdlog_filter_list[PROFILER_CMDLOG_FILTER_SIZE] = { false, };
 
 static int profiler_do_seqtbl_by_index_nolock(struct profiler_device *p, int index)
 {
@@ -220,11 +220,11 @@ static int update_profile_te(struct profiler_device *p, s64 time_us)
 
 	te_info->last_diff = time_us - te_info->last_time;
 	te_info->last_time = time_us;
-	spin_unlock(&te_info->slock);
 
 	prof_info(p, te_debug, "last time: %lld, diff: %lld\n", te_info->last_time, te_info->last_diff);
 	te_info->times[te_info->idx++] = te_info->last_diff;
 	te_info->idx = te_info->idx % MAX_TE_CNT;
+	spin_unlock(&te_info->slock);
 
 	return ret;
 }
@@ -303,7 +303,6 @@ static int print_cmdlog(struct profiler_device *p)
 {
 	struct profiler_cmdlog_data *c;
 	int h, t;
-	s64 time = 0;
 	u32 tmp;
 	bool dir_read, dir_write;
 
@@ -333,16 +332,11 @@ static int print_cmdlog(struct profiler_device *p)
 			//panel log print
 			tmp = PROFILER_DATALOG_MASK_SUB(c->pkt_type);
 			if (tmp == PROFILER_DATALOG_PANEL_CMD_FLUSH_START) {
-				time = c->time;
 				prof_info(p, cmdlog_disp, "cmdlog[%d] PANEL_LOG FLUSH_START cmdcnt %d, payload %d, time %lld\n",
 					t, c->cmd, c->size, c->time);
 			} else if (tmp == PROFILER_DATALOG_PANEL_CMD_FLUSH_END) {
-				if (time > 0)
-					time = c->time - time;
-				else
-					time = 0;
-				prof_info(p, cmdlog_disp, "cmdlog[%d] PANEL_LOG FLUSH_END cmdcnt %d, payload %d, elapsed: %lldus, time %lld\n",
-					t, c->cmd, c->size, time / 1000, c->time);
+				prof_info(p, cmdlog_disp, "cmdlog[%d] PANEL_LOG FLUSH_END cmdcnt %d, payload %d, elapsed: %lldus\n",
+					t, c->cmd, c->size, c->time / 1000);
 			}
 		}
 		t = (t + 1) % PROFILER_CMDLOG_SIZE;
@@ -361,6 +355,7 @@ static int insert_cmdlog(struct profiler_device *p, struct profiler_cmdlog_data 
 	struct timespec last_ts = { 0, };
 	struct timespec delta_ts = { 0, };
 	s64 elapsed_nsec;
+	size_t i;
 
 	if (!profiler_is_cmdlog_initialized(p)) {
 		//not initialized
@@ -369,12 +364,11 @@ static int insert_cmdlog(struct profiler_device *p, struct profiler_cmdlog_data 
 
 	if ((PROFILER_DATALOG_MASK_PROTO(log->pkt_type) == PROFILER_DATALOG_CMD_DSI)
 		&& prof_en(p, cmdlog_filter)) {
-		if ((log->cmd & 0xFF) < PROFILER_CMDLOG_FILTER_SIZE+1) {
-			if (profiler_cmdlog_filter_list[(log->cmd & 0xFF)] == false) {
-				prof_info(p, cmdlog_debug, "filtered cmd 0x%02x, type 0x%02x ofs 0x%02x, len %d\n",
-						 log->cmd, log->pkt_type, log->offset, log->size);
-				return 0;
-			}
+		i = log->cmd & 0xFF;
+		if (profiler_cmdlog_filter_list[i] == false) {
+			prof_info(p, cmdlog_debug, "filtered cmd 0x%02x, type 0x%02x ofs 0x%02x, len %d\n",
+					 log->cmd, log->pkt_type, log->offset, log->size);
+			return 0;
 		}
 	}
 
@@ -738,7 +732,7 @@ static ssize_t prop_config_mprint_show(struct device *dev,
 	struct panel_device *panel = dev_get_drvdata(dev);
 	int *data;
 	int len = 0;
-	u32 i;
+	size_t i;
 	const char *cfg_name;
 	
 	p = &panel->profiler;
@@ -760,7 +754,7 @@ static ssize_t prop_config_mprint_show(struct device *dev,
 	}
 	len += snprintf(buf + len, PAGE_SIZE - len, "\n");
 
-	for (i=0; i<sizeof(struct mprint_config) / sizeof(int); i++) {
+	for (i = 0; i < sizeof(struct mprint_config) / sizeof(int); i++) {
 		len += snprintf(buf + len, PAGE_SIZE - len, "%12d", *(data + i));
 	}
 	len += snprintf(buf + len, PAGE_SIZE - len, "\n");
@@ -775,7 +769,7 @@ static ssize_t prop_config_mprint_store(struct device *dev,
 	struct panel_device *panel = dev_get_drvdata(dev);
 	int *data;
 	int val, len = 0, read, ret;
-	u32 i;
+	size_t i;
 
 	p = &panel->profiler;
 	if (p == NULL) {
@@ -795,7 +789,7 @@ static ssize_t prop_config_mprint_store(struct device *dev,
 			break;
 		*(data+i) = val;
 		len += read;
-		panel_info("[D_PROF] config[%d] set to %d\n", i, val);
+		panel_info("[D_PROF] config[%lu] set to %d\n", i, val);
 	}
 
 	return size;
@@ -845,8 +839,8 @@ static ssize_t prop_config_show(struct device *dev,
 	struct profiler_device *p;
 	struct panel_device *panel = dev_get_drvdata(dev);
 	int *data;
-	int i, len = 0;
-	u32 count;
+	int len = 0;
+	size_t i, count;
 	
 	p = &panel->profiler;
 	if (p == NULL) {
@@ -866,7 +860,7 @@ static ssize_t prop_config_show(struct device *dev,
 
 	if (count != ARRAY_SIZE(profiler_config_names)) {
 		len += snprintf(buf + len, PAGE_SIZE - len,
-			"CONFIG SIZE MISMATCHED!! configurations are may be wrong(%d, %lu)\n",
+			"CONFIG SIZE MISMATCHED!! configurations are may be wrong(%lu, %lu)\n",
 			count, ARRAY_SIZE(profiler_config_names));
 	}
 
@@ -875,7 +869,7 @@ static ssize_t prop_config_show(struct device *dev,
 
 	data = (int *) p->conf;
 
-	for (i=0; i<count; i++) {
+	for (i = 0; i < count; i++) {
 		len += snprintf(buf + len, PAGE_SIZE - len, "%s=%d%s",
 			(i < ARRAY_SIZE(profiler_config_names)) ? profiler_config_names[i] : "(null)",
 			*(data+i),
@@ -894,7 +888,7 @@ static ssize_t prop_config_store(struct device *dev,
 	char *strbuf, *tok, *field, *value;
 	int *data;
 	int val, ret;
-	u32 i;
+	size_t i;
 
 	p = &panel->profiler;
 	if (p == NULL) {
@@ -1001,8 +995,9 @@ static ssize_t prop_config_cmdlog_filter_store(struct device *dev,
 	char str[STORE_BUFFER_SIZE] = { 0, };
 	char *strbuf, *tok;
 	int *data;
-	int val, ret;
-	u32 i;
+	int ret;
+	u32 val;
+	size_t i;
 
 	p = &panel->profiler;
 	if (p == NULL) {
@@ -1021,12 +1016,12 @@ static ssize_t prop_config_cmdlog_filter_store(struct device *dev,
 
 	//all on
 	if (!strncmp(str, "allon", 5)) {
-		for (i=0; i<ARRAY_SIZE(profiler_cmdlog_filter_list); i++)
+		for (i = 0; i < ARRAY_SIZE(profiler_cmdlog_filter_list); i++)
 			profiler_cmdlog_filter_list[i] = true;
 		return size;
 	}
 	if (!strncmp(str, "alloff", 6)) {
-		for (i=0; i<ARRAY_SIZE(profiler_cmdlog_filter_list); i++)
+		for (i = 0; i < ARRAY_SIZE(profiler_cmdlog_filter_list); i++)
 			profiler_cmdlog_filter_list[i] = false;
 		return size;
 	}
@@ -1037,7 +1032,7 @@ static ssize_t prop_config_cmdlog_filter_store(struct device *dev,
 			panel_err("invalid value %s, ret %d\n", tok, ret);
 			return ret;
 		}
-		if (val < 0 || val >= ARRAY_SIZE(profiler_cmdlog_filter_list)) {
+		if (val >= ARRAY_SIZE(profiler_cmdlog_filter_list)) {
 			panel_err("invalid value %s, ret %d\n", tok, ret);
 			continue;
 		}
@@ -1057,7 +1052,7 @@ struct device_attribute profiler_attrs[] = {
 int profiler_probe(struct panel_device *panel, struct profiler_tune *tune)
 {
 	int ret = 0;
-	u32 i;
+	size_t i;
 	struct lcd_device *lcd;
 	struct profiler_device *p;
 

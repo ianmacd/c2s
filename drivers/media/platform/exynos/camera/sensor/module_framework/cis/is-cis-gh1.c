@@ -154,6 +154,10 @@ static void sensor_gh1_cis_data_calculation(const struct sensor_pll_info_compact
 					/ (vt_pix_clk_hz / 1000));
 	cis_data->cur_frame_us_time = cis_data->min_frame_us_time;
 
+#ifdef CAMERA_REAR2
+	cis_data->min_sync_frame_us_time = cis_data->min_frame_us_time;
+#endif
+
 	/* 3. FPS calculation */
 	frame_rate = vt_pix_clk_hz / (pll_info_compact->frame_length_lines * pll_info_compact->line_length_pck);
 	dbg_sensor(1, "frame_rate (%d) = vt_pix_clk_hz(%d) / "
@@ -603,7 +607,7 @@ int sensor_gh1_cis_set_xtc_calibration(struct is_cis *cis)
 		err("tetra xtc_calibration fail!");
 		goto p_err;
 	}
-	
+
 #ifdef GH1_NON_BURST
 	ret |= is_sensor_write16(cis->client, 0x6028, 0x2001); /* cal page */
 	for (i = 0; i < cal_size; i+=2) {
@@ -780,7 +784,7 @@ int sensor_gh1_cis_mode_change(struct v4l2_subdev *subdev, u32 mode)
 			}
 			xtc_cal_first = false;
 		}
-		if (xtc_skip && mode == SENSOR_GH1_7296X5472_15FPS) { 
+		if (xtc_skip && mode == SENSOR_GH1_7296X5472_15FPS) {
 			info("[%s] bypass xtc calibration",__func__);
 			/* XTC disable register : \x 2000 42C0 */
 			ret = is_sensor_write16(cis->client, 0x6028, 0x2000);
@@ -1516,7 +1520,11 @@ int sensor_gh1_cis_set_frame_rate(struct v4l2_subdev *subdev, u32 min_fps)
 		goto p_err;
 	}
 
+#ifdef CAMERA_REAR2
+	cis_data->min_frame_us_time = MAX(frame_duration, cis_data->min_sync_frame_us_time);
+#else
 	cis_data->min_frame_us_time = frame_duration;
+#endif
 
 #ifdef DEBUG_SENSOR_TIME
 	do_gettimeofday(&end);

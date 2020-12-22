@@ -1907,25 +1907,6 @@ static struct maptbl r8s_pre_mdnie_maptbl[MAX_MDNIE_MAPTBL][NR_EA8076_MDNIE_REG]
 		DEFINE_MAPTBL("hbm_5", (u8 *)r8s_pre_mdnie_hbm_table + EA8076_MDNIE_5_OFS, 1, 1, EA8076_MDNIE_LEN, EA8076_MDNIE_5_LEN,
 				init_common_table, getidx_common_maptbl, copy_common_maptbl),
 	},
-
-#ifdef CONFIG_SUPPORT_HMD
-	/* HMD */
-	[MDNIE_HMD_MAPTBL] = {
-		DEFINE_MAPTBL("hmd_0", (u8 *)r8s_pre_mdnie_hmd_table + EA8076_MDNIE_0_OFS, 1, MODE_MAX, EA8076_MDNIE_LEN, EA8076_MDNIE_0_LEN,
-				init_common_table, getidx_mdnie_hmd_maptbl, copy_common_maptbl),
-		DEFINE_MAPTBL("hmd_1", (u8 *)r8s_pre_mdnie_hmd_table + EA8076_MDNIE_1_OFS, 1, MODE_MAX, EA8076_MDNIE_LEN, EA8076_MDNIE_1_LEN,
-				init_common_table, getidx_mdnie_hmd_maptbl, copy_common_maptbl),
-		DEFINE_MAPTBL("hmd_2", (u8 *)r8s_pre_mdnie_hmd_table + EA8076_MDNIE_2_OFS, 1, MODE_MAX, EA8076_MDNIE_LEN, EA8076_MDNIE_2_LEN,
-				init_common_table, getidx_mdnie_hmd_maptbl, copy_common_maptbl),
-		DEFINE_MAPTBL("hmd_3", (u8 *)r8s_pre_mdnie_hmd_table + EA8076_MDNIE_3_OFS, 1, MODE_MAX, EA8076_MDNIE_LEN, EA8076_MDNIE_3_LEN,
-				init_common_table, getidx_mdnie_hmd_maptbl, copy_common_maptbl),
-		DEFINE_MAPTBL("hmd_4", (u8 *)r8s_pre_mdnie_hmd_table + EA8076_MDNIE_4_OFS, 1, MODE_MAX, EA8076_MDNIE_LEN, EA8076_MDNIE_4_LEN,
-				init_common_table, getidx_mdnie_hmd_maptbl, copy_common_maptbl),
-		DEFINE_MAPTBL("hmd_5", (u8 *)r8s_pre_mdnie_hmd_table + EA8076_MDNIE_5_OFS, 1, MODE_MAX, EA8076_MDNIE_LEN, EA8076_MDNIE_5_LEN,
-				init_common_table, getidx_mdnie_hmd_maptbl, copy_common_maptbl),
-	},
-#endif
-
 	/* HDR */
 	[MDNIE_HDR_MAPTBL] = {
 		DEFINE_MAPTBL("hdr_0", (u8 *)r8s_pre_mdnie_hdr_table + EA8076_MDNIE_0_OFS, 1, MODE_MAX, EA8076_MDNIE_LEN, EA8076_MDNIE_0_LEN,
@@ -2065,28 +2046,6 @@ static DEFINE_VARIABLE_PACKET(r8s_pre_mdnie_3, DSI_PKT_TYPE_WR, R8S_PRE_MDNIE_3,
 static DEFINE_VARIABLE_PACKET(r8s_pre_mdnie_4, DSI_PKT_TYPE_WR, R8S_PRE_MDNIE_4, 0);
 static DEFINE_VARIABLE_PACKET(r8s_pre_mdnie_5, DSI_PKT_TYPE_WR, R8S_PRE_MDNIE_5, 0);
 
-#ifdef CONFIG_SUPPORT_AFC
-static u8 R8S_PRE_AFC_OFF[] = { EA8076_AFC_REG, 0x00 };
-static u8 R8S_PRE_AFC_ON[EA8076_AFC_LEN + 1] = {
-	EA8076_AFC_REG,
-	0x01, 0x00, 0x03, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x05, 0x9F,
-	0x00, 0x53, 0x00, 0x00, 0x00, 0x54, 0x05, 0x9F, 0x01, 0x2C,
-	0x00, 0x00, 0x01, 0x2D, 0x05, 0x9F, 0x0A, 0xE7, 0x00, 0x00,
-	0x0A, 0xE8, 0x05, 0x9F, 0x0B, 0xDF, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x40, 0x00, 0x80, 0x00, 0x80, 0x01, 0x00,
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-};
-
-static struct maptbl r8s_pre_afc_maptbl[] = {
-	[AFC_ON_MAPTBL] = DEFINE_0D_MAPTBL(r8s_pre_afc_table, init_common_table, NULL, copy_afc_maptbl),
-};
-static DEFINE_STATIC_PACKET(r8s_pre_afc_off, DSI_PKT_TYPE_WR, R8S_PRE_AFC_OFF, 0);
-static DEFINE_PKTUI(r8s_pre_afc_on, &r8s_pre_afc_maptbl[AFC_ON_MAPTBL],
-		EA8076_DATA_OFS + EA8076_AFC_ROI_OFS);
-static DEFINE_VARIABLE_PACKET(r8s_pre_afc_on, DSI_PKT_TYPE_WR, R8S_PRE_AFC_ON, 0);
-#endif
-
 static struct keyinfo KEYINFO(r8s_pre_level2_key_enable);
 static struct keyinfo KEYINFO(r8s_pre_level2_key_disable);
 
@@ -2101,26 +2060,8 @@ static void *r8s_pre_mdnie_cmdtbl[] = {
 	&KEYINFO(r8s_pre_level2_key_disable),
 };
 
-#ifdef CONFIG_SUPPORT_AFC
-static void *r8s_pre_afc_off_cmdtbl[] = {
-	&KEYINFO(r8s_pre_level2_key_enable),
-	&PKTINFO(r8s_pre_afc_off),
-	&KEYINFO(r8s_pre_level2_key_disable),
-};
-
-static void *r8s_pre_afc_on_cmdtbl[] = {
-	&KEYINFO(r8s_pre_level2_key_enable),
-	&PKTINFO(r8s_pre_afc_on),
-	&KEYINFO(r8s_pre_level2_key_disable),
-};
-#endif
-
 static struct seqinfo r8s_pre_mdnie_seqtbl[MAX_MDNIE_SEQ] = {
 	[MDNIE_SET_SEQ] = SEQINFO_INIT("set-mdnie-seq", r8s_pre_mdnie_cmdtbl),
-#ifdef CONFIG_SUPPORT_AFC
-	[MDNIE_AFC_OFF_SEQ] = SEQINFO_INIT("afc-off-seq", r8s_pre_afc_off_cmdtbl),
-	[MDNIE_AFC_ON_SEQ] = SEQINFO_INIT("afc-on-seq", r8s_pre_afc_on_cmdtbl),
-#endif
 };
 
 static struct mdnie_tune ea8076_r8s_pre_mdnie_tune = {
@@ -2132,10 +2073,6 @@ static struct mdnie_tune ea8076_r8s_pre_mdnie_tune = {
 	.nr_scr_white_maptbl = (sizeof(r8s_pre_mdnie_scr_white_maptbl) / sizeof(struct maptbl)),
 	.etc_maptbl = (struct maptbl *)r8s_pre_mdnie_etc_maptbl,
 	.nr_etc_maptbl = (sizeof(r8s_pre_mdnie_etc_maptbl) / sizeof(struct maptbl)),
-#ifdef CONFIG_SUPPORT_AFC
-	.afc_maptbl = (struct maptbl *)r8s_pre_afc_maptbl,
-	.nr_afc_maptbl = (sizeof(r8s_pre_afc_maptbl) / sizeof(struct maptbl)),
-#endif
 	.line = {
 		{ .num = EA8076_R8S_PRE_LINE_0_NUM, .den = EA8076_R8S_PRE_LINE_0_DEN, .con = EA8076_R8S_PRE_LINE_0_CON },
 		{ .num = EA8076_R8S_PRE_LINE_1_NUM, .den = EA8076_R8S_PRE_LINE_1_DEN, .con = EA8076_R8S_PRE_LINE_1_CON },

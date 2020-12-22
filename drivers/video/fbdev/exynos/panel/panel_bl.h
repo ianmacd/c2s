@@ -159,6 +159,7 @@ struct panel_bl_properties {
 	int mask_layer_br_target;
 	int mask_layer_br_actual;
 	int mask_layer_br_hook;
+	ktime_t last_br_update_time;
 #endif
 };
 

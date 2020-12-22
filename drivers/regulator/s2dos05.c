@@ -37,6 +37,7 @@
 #include <linux/regulator/s2dos05.h>
 #include <linux/regulator/of_regulator.h>
 #include <linux/regulator/pmic_class.h>
+#include <kunit/mock.h>
 
 #ifdef CONFIG_SEC_PM
 #include <linux/sec_class.h>
@@ -62,6 +63,7 @@ struct s2dos05_data {
 #endif /* CONFIG_SEC_PM */
 };
 
+__mockable
 int s2dos05_read_reg(struct i2c_client *i2c, u8 reg, u8 *dest)
 {
 	struct s2dos05_data *info = i2c_get_clientdata(i2c);
@@ -143,6 +145,7 @@ int s2dos05_bulk_write(struct i2c_client *i2c, u8 reg, int count, u8 *buf)
 	return 0;
 }
 
+__mockable
 int s2dos05_update_reg(struct i2c_client *i2c, u8 reg, u8 val, u8 mask)
 {
 	struct s2dos05_data *info = i2c_get_clientdata(i2c);
@@ -281,26 +284,83 @@ static int s2m_set_voltage_time_sel(struct regulator_dev *rdev,
 }
 
 #ifdef CONFIG_SEC_PM
-static int s2m_set_elvss_short_detection(struct regulator_dev *rdev,
-					 bool enable, int lv_uA)
+__visible_for_testing
+int s2m_ssd_convert_uA_to_reg_val(bool enable, int min_uA, int max_uA,
+					u8 *val, u8 *mask)
 {
-	struct s2dos05_data *info = rdev_get_drvdata(rdev);
-	struct i2c_client *i2c = info->iodev->i2c;
-	int ret = -ENODEV;
-	u8 lv = 0, val, mask;
+	u8 sel = 0;
 
 	if (enable) {
-		lv = lv_uA / 2000 - 1;
+		while (2000 * (sel + 1) < min_uA)
+			sel++;
 
-		if (lv > 3)
+		if (2000 * (sel + 1) > max_uA)
 			return -EINVAL;
 	}
 
-	val = (!enable << 3) | (lv << 5);
-	mask = S2DOS05_ELVSS_SSD_EN_MASK | S2DOS05_ELVSS_SEL_SSD_MASK;
+	*val = (!enable << 3) | (sel << 5);
+	*mask = S2DOS05_ELVSS_SSD_EN_MASK | S2DOS05_ELVSS_SEL_SSD_MASK;
+
+	return 0;
+}
+
+__visible_for_testing
+int s2m_set_elvss_short_detection(struct regulator_dev *rdev,
+					bool enable, int lv_uA)
+{
+	struct s2dos05_data *info = rdev_get_drvdata(rdev);
+	struct i2c_client *i2c = info->iodev->i2c;
+	int ret;
+	u8 val = 0, mask = 0;
+
+	ret = s2m_ssd_convert_uA_to_reg_val(enable, lv_uA, lv_uA, &val, &mask);
+	if (ret < 0)
+		return ret;
 
 	ret = s2dos05_update_reg(i2c, S2DOS05_REG_SSD_TSD, val, mask);
 	return ret;
+}
+
+__visible_for_testing
+int s2m_set_elvss_ssd_current_limit(struct regulator_dev *rdev,
+					int min_uA, int max_uA)
+{
+	struct s2dos05_data *info = rdev_get_drvdata(rdev);
+	struct i2c_client *i2c = info->iodev->i2c;
+	int ret;
+	bool enable;
+	u8 val = 0, mask = 0;
+
+	enable = min_uA || max_uA;
+
+	ret = s2m_ssd_convert_uA_to_reg_val(enable, min_uA, max_uA, &val, &mask);
+	if (ret < 0)
+		return ret;
+
+	ret = s2dos05_update_reg(i2c, S2DOS05_REG_SSD_TSD, val, mask);
+	return ret;
+}
+
+__visible_for_testing
+int s2m_get_elvss_ssd_current_limit(struct regulator_dev *rdev)
+{
+	struct s2dos05_data *info = rdev_get_drvdata(rdev);
+	struct i2c_client *i2c = info->iodev->i2c;
+	int ret;
+	bool enable;
+	u8 val;
+
+	ret = s2dos05_read_reg(i2c, S2DOS05_REG_SSD_TSD, &val);
+	if (ret < 0)
+		return ret;
+
+	enable = !(val & S2DOS05_ELVSS_SSD_EN_MASK);
+
+	if (!enable)
+		return 0;
+
+	ret = (val & S2DOS05_ELVSS_SEL_SSD_MASK) >> 5;
+	return (ret + 1) * 2000;
 }
 #endif /* CONFIG_SEC_PM */
 
@@ -329,6 +389,8 @@ static struct regulator_ops s2dos05_buck_ops = {
 #ifdef CONFIG_SEC_PM
 static struct regulator_ops s2dos05_elvss_ops = {
 	.set_short_detection	= s2m_set_elvss_short_detection,
+	.set_current_limit	= s2m_set_elvss_ssd_current_limit,
+	.get_current_limit	= s2m_get_elvss_ssd_current_limit,
 };
 #endif
 

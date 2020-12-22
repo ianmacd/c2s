@@ -566,6 +566,7 @@ static int pn547_dev_release(struct inode *inode, struct file *filp)
 #endif
 
 	NFC_LOG_INFO("release\n");
+	set_force_reset(false);
 	if (pn547_dev->firm_gpio)
 		gpio_set_value(pn547_dev->firm_gpio, 0);
 
@@ -670,6 +671,16 @@ static void p61_get_access_state(struct pn547_dev *pn547_dev,
 		NFC_LOG_ERR("invalid state of p61_access_state\n");
 	else
 		*current_state = pn547_dev->p61_current_state;
+}
+
+static void p61_access_lock(struct pn547_dev *pn547_dev)
+{
+	mutex_lock(&pn547_dev->p61_state_mutex);
+}
+
+static void p61_access_unlock(struct pn547_dev *pn547_dev)
+{
+	mutex_unlock(&pn547_dev->p61_state_mutex);
 }
 
 static int signal_handler(int state, long nfc_pid)
@@ -1225,6 +1236,14 @@ static int pn547_p61_set_spi_pwr(struct pn547_dev *pdev,
 		NFC_LOG_INFO("ISO RESET from SPI DONE\n");
 #endif
 		break;
+	case 7:
+		set_force_reset(true);
+		ret = do_reset_protection(true);
+		break;
+	case 8:
+		set_force_reset(false);
+		ret = do_reset_protection(false);
+		break;
 	default:
 		NFC_LOG_ERR("bad ese pwr arg %lu\n", arg);
 		ret = -EBADRQC; /* Invalid request code */
@@ -1415,7 +1434,7 @@ long pn547_dev_ioctl(struct file *filp,
 		break;
 	}
 	/* Free pass autobahn area, not protected. Use it carefullly. END */
-
+	p61_access_lock(pn547_dev);
 	switch (cmd) {
 	case PN547_SET_PWR:
 		ret = pn547_set_pwr(pn547_dev, arg);
@@ -1443,11 +1462,15 @@ long pn547_dev_ioctl(struct file *filp,
 	case P61_SET_WIRED_ACCESS:
 		ret = pn547_p61_set_wired_access(pn547_dev, arg);
 		break;
+	case PN547_GET_IRQ_STATE:
+		ret = gpio_get_value(pn547_dev->irq_gpio);
+		break;
 
 	default:
 		NFC_LOG_ERR("bad ioctl cmd:%x\n", cmd);
 		ret = -EINVAL;
 	}
+	p61_access_unlock(pn547_dev);
 	return (long)ret;
 #else
 	switch (cmd) {
@@ -1927,6 +1950,7 @@ static int pn547_probe(struct i2c_client *client, const struct i2c_device_id *id
 	init_completion(&pn547_dev->svdd_sync_comp);
 	init_completion(&pn547_dev->dwp_onoff_comp);
 	sema_init(&dwp_onoff_release_sema, 0);
+	mutex_init(&pn547_dev->p61_state_mutex);
 #endif
 
 	pn547_dev->pn547_device.minor = MISC_DYNAMIC_MINOR;
@@ -2082,10 +2106,13 @@ err_misc_register:
 	ese_reset_resource_destroy();
 #endif
 	mutex_destroy(&pn547_dev->read_mutex);
-err_ioremap:
+#ifdef CONFIG_NFC_PN547_ESE_SUPPORT
+	mutex_destroy(&pn547_dev->p61_state_mutex);
+#endif
+err_pvdd:
 	if (!pn547_dev->clkctrl)
 		iounmap(pn547_dev->clkctrl);
-err_pvdd:
+err_ioremap:
 #if defined(CONFIG_NFC_PN547_ESE_SUPPORT) && defined(FEATURE_PN80T)
 	gpio_free(pn547_dev->ese_pwr_req);
 err_ese:
@@ -2126,6 +2153,7 @@ static int pn547_remove(struct i2c_client *client)
 	pn547_dev->p61_current_state = P61_STATE_INVALID;
 	pn547_dev->nfc_ven_enabled = false;
 	pn547_dev->spi_ven_enabled = false;
+	mutex_destroy(&pn547_dev->p61_state_mutex);
 #endif
 #ifdef FEATURE_SN100X
 	ese_reset_resource_destroy();

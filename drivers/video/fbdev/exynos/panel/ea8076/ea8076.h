@@ -145,14 +145,6 @@
 #define EA8076_MDNIE_5_LEN		(1)
 #define EA8076_MDNIE_LEN		(EA8076_MDNIE_0_LEN + EA8076_MDNIE_1_LEN + EA8076_MDNIE_2_LEN + EA8076_MDNIE_3_LEN + EA8076_MDNIE_4_LEN + EA8076_MDNIE_5_LEN)
 
-#ifdef CONFIG_SUPPORT_AFC
-#define EA8076_AFC_REG			(0xE2)
-#define EA8076_AFC_OFS			(0)
-#define EA8076_AFC_LEN			(70)
-#define EA8076_AFC_ROI_OFS		(55)
-#define EA8076_AFC_ROI_LEN		(12)
-#endif
-
 #define EA8076_SCR_CR_OFS	(1)
 #define EA8076_SCR_WR_OFS	(19)
 #define EA8076_SCR_WG_OFS	(20)
@@ -307,6 +299,7 @@ enum {
 #ifdef CONFIG_SUPPORT_GRAYSPOT_TEST
 	READ_GRAYSPOT_CAL,
 #endif
+	MAX_READTBL,
 };
 
 enum {
@@ -355,6 +348,7 @@ enum {
 #endif
 	RES_SELF_MASK_CHECKSUM,
 	RES_SELF_MASK_CRC,
+	MAX_RESTBL
 };
 
 enum {
@@ -382,7 +376,7 @@ static u8 EA8076_DSI_ERR[EA8076_DSI_ERR_LEN];
 static u8 EA8076_SELF_DIAG[EA8076_SELF_DIAG_LEN];
 
 
-static struct rdinfo ea8076_rditbl[] = {
+static struct rdinfo ea8076_rditbl[MAX_READTBL] = {
 	[READ_ID] = RDINFO_INIT(id, DSI_PKT_TYPE_RD, EA8076_ID_REG, EA8076_ID_OFS, EA8076_ID_LEN),
 	[READ_COORDINATE] = RDINFO_INIT(coordinate, DSI_PKT_TYPE_RD, EA8076_COORDINATE_REG, EA8076_COORDINATE_OFS, EA8076_COORDINATE_LEN),
 	[READ_CODE] = RDINFO_INIT(code, DSI_PKT_TYPE_RD, EA8076_CODE_REG, EA8076_CODE_OFS, EA8076_CODE_LEN),
@@ -421,7 +415,7 @@ static DEFINE_RESUI(dsi_err, &ea8076_rditbl[READ_DSI_ERR], 0);
 static DEFINE_RESUI(self_diag, &ea8076_rditbl[READ_SELF_DIAG], 0);
 
 
-static struct resinfo ea8076_restbl[] = {
+static struct resinfo ea8076_restbl[MAX_RESTBL] = {
 	[RES_ID] = RESINFO_INIT(id, EA8076_ID, RESUI(id)),
 	[RES_COORDINATE] = RESINFO_INIT(coordinate, EA8076_COORDINATE, RESUI(coordinate)),
 	[RES_CODE] = RESINFO_INIT(code, EA8076_CODE, RESUI(code)),
@@ -505,9 +499,6 @@ static int getidx_fast_discharge_table(struct maptbl *tbl);
 #ifdef CONFIG_EXYNOS_DECON_MDNIE_LITE
 static int init_color_blind_table(struct maptbl *tbl);
 static int getidx_mdnie_scenario_maptbl(struct maptbl *tbl);
-#ifdef CONFIG_SUPPORT_HMD
-static int getidx_mdnie_hmd_maptbl(struct maptbl *tbl);
-#endif
 static int getidx_mdnie_hdr_maptbl(struct maptbl *tbl);
 static int init_mdnie_night_mode_table(struct maptbl *tbl);
 static int getidx_mdnie_night_mode_maptbl(struct maptbl *tbl);
@@ -530,7 +521,4 @@ static int getidx_mdnie_5_maptbl(struct pkt_update_info *pktui);
 static int getidx_mdnie_scr_white_maptbl(struct pkt_update_info *pktui);
 static void update_current_scr_white(struct maptbl *tbl, u8 *dst);
 #endif /* CONFIG_EXYNOS_DECON_MDNIE_LITE */
-#ifdef CONFIG_DYNAMIC_FREQ
-static int getidx_dyn_ffc_table(struct maptbl *tbl);
-#endif
 #endif /* __EA8076_H__ */

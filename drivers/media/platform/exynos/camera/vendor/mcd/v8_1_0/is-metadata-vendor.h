@@ -1985,6 +1985,7 @@ enum camera_op_mode {
 	CAMERA_OP_MODE_HAL3_SDK,
 	CAMERA_OP_MODE_HAL3_CAMERAX,
 	CAMERA_OP_MODE_HAL3_AVSP,
+	CAMERA_OP_MODE_HAL3_SDK_VIP,
 };
 
 enum camera2_sensor_hdr_mode {
@@ -2251,6 +2252,10 @@ enum camera_client_index {
 	CAMERA_APP_CATEGORY_KAKAOBANK          = 13,
 	CAMERA_APP_CATEGORY_CAMCARD            = 14,
 	CAMERA_APP_CATEGORY_CAMCARD_FREE       = 15,
+	CAMERA_APP_CATEGORY_SNOW               = 16,
+	CAMERA_APP_CATEGORY_B612               = 17,
+	CAMERA_APP_CATEGORY_SODA               = 18,
+	CAMERA_APP_CATEGORY_FOODIE             = 19,
 	CAMERA_APP_CATEGORY_MAX
 };
 

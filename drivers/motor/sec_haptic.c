@@ -18,14 +18,16 @@
 #include <linux/regulator/consumer.h>
 #include <linux/sec_class.h>
 #include <linux/motor/sec_haptic.h>
+#include <kunit/mock.h>
+
 #if defined(CONFIG_SSP_MOTOR_CALLBACK)
 #include <linux/ssp_motorcallback.h>
 #endif
+#ifdef CONFIG_BATTERY_SAMSUNG
 #include "../battery_v2/include/sec_charging_common.h"
+#endif
 
-
-static struct sec_haptic_drvdata *pddata;
-
+#ifdef CONFIG_BATTERY_SAMSUNG
 static int sec_get_temperature_duty_ratio(struct sec_haptic_drvdata *ddata)
 {
 	union power_supply_propval value = {0, };
@@ -37,16 +39,18 @@ static int sec_get_temperature_duty_ratio(struct sec_haptic_drvdata *ddata)
 	pr_info("%s temp:%d duty:%d\n", __func__, value.intval, ret);
 	return ret;
 }
+#endif
 
-
-static int sec_haptic_set_frequency(struct sec_haptic_drvdata *ddata,
+__visible_for_testing int sec_haptic_set_frequency(struct sec_haptic_drvdata *ddata,
 	int num)
 {
 	int duty_ratio = ddata->ratio;
 
+#ifdef CONFIG_BATTERY_SAMSUNG
 	if (ddata->high_temp_ratio)
 		duty_ratio = sec_get_temperature_duty_ratio(ddata);
-	
+#endif
+
 	if (num >= 0 && num < ddata->multi_frequency) {
 		ddata->period = ddata->multi_freq_period[num];
 		ddata->duty = ddata->max_duty = (ddata->period * duty_ratio) / 100;
@@ -325,7 +329,7 @@ static ssize_t intensity_store(struct device *dev,
 	}
 
 	pr_info("%s %d\n", __func__, intensity);
-	
+
 	if ((intensity < 1) || ( intensity > MAX_INTENSITY)) {
 		pr_err("%s out of range %d\n", __func__, intensity);
 		return -EINVAL;
@@ -404,7 +408,7 @@ static ssize_t multi_freq_store(struct device *dev,
 
 	if (num < 0 || num >= HOMEKEY_PRESS_FREQ)
 		return -EINVAL;
-	
+
 	ret = sec_haptic_set_frequency(ddata, num);
 	if (ret)
 		return ret;
@@ -613,7 +617,6 @@ int sec_haptic_register(struct sec_haptic_drvdata *ddata)
 		goto err_sysfs3;
 	}
 	ddata->ratio = ddata->normal_ratio;
-	pddata = ddata;
 
 	return ret;
 
@@ -641,68 +644,9 @@ int sec_haptic_unregister(struct sec_haptic_drvdata *ddata)
 	sec_haptic_enable(ddata, false);
 	device_destroy(ddata->to_class, MKDEV(0, 0));
 	class_destroy(ddata->to_class);
-	pddata = NULL;
 	kfree(ddata);
 	return 0;
 }
-#if 0
-extern int haptic_homekey_press(void)
-{
-	struct sec_haptic_drvdata *ddata = pddata;
-	struct hrtimer *timer;
 
-	if (ddata == NULL)
-		return -1;
-	if (!ddata->multi_frequency)
-		return -1;
-	timer = &ddata->timer;
-
-	sec_haptic_boost(ddata, BOOST_ON);
-
-	mutex_lock(&ddata->mutex);
-	ddata->timeout = HOMEKEY_DURATION;
-	sec_haptic_set_frequency(ddata, HOMEKEY_PRESS_FREQ);
-	sec_haptic_set_intensity(ddata, ddata->force_touch_intensity);
-	sec_haptic_enable(ddata, true);
-
-	pr_info("%s freq:%d, intensity:%d, time:%d\n", __func__,
-			HOMEKEY_PRESS_FREQ, ddata->force_touch_intensity, ddata->timeout);
-	mutex_unlock(&ddata->mutex);
-
-	hrtimer_start(timer,
-		ns_to_ktime((u64)ddata->timeout * NSEC_PER_MSEC),
-		HRTIMER_MODE_REL);
-
-	return 0;
-}
-
-extern int haptic_homekey_release(void)
-{
-	struct sec_haptic_drvdata *ddata = pddata;
-	struct hrtimer *timer;
-
-	if (ddata == NULL)
-		return -1;
-	if (!ddata->multi_frequency)
-		return -1;
-	timer = &ddata->timer;
-
-	mutex_lock(&ddata->mutex);
-	ddata->timeout = HOMEKEY_DURATION;
-	sec_haptic_set_frequency(ddata, HOMEKEY_RELEASE_FREQ);
-	sec_haptic_set_intensity(ddata, ddata->force_touch_intensity);
-	sec_haptic_enable(ddata, true);
-
-	pr_info("%s freq:%d, intensity:%d, time:%d\n", __func__,
-			HOMEKEY_RELEASE_FREQ, ddata->force_touch_intensity, ddata->timeout);
-	mutex_unlock(&ddata->mutex);
-
-	hrtimer_start(timer,
-		ns_to_ktime((u64)ddata->timeout * NSEC_PER_MSEC),
-		HRTIMER_MODE_REL);
-
-	return 0;
-}
-#endif
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("sec haptic driver");

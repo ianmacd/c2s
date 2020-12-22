@@ -22,9 +22,6 @@
 #include <linux/sec_debug.h>
 #include <linux/sec_class.h>
 
-#define NAD_PRINT(format, ...) printk("[NAD] " format, ##__VA_ARGS__)
-#define NAD_DEBUG
-
 #if defined(CONFIG_SEC_FACTORY)
 
 #if defined(CONFIG_SEC_NAD_BPS_CLASSIFIER)
@@ -123,7 +120,7 @@ static void sec_nad_param_update(struct work_struct *work)
 	struct sec_nad_param *param_data =
 		container_of(work, struct sec_nad_param, sec_nad_work);
 
-	NAD_PRINT("%s: set param at %s\n", __func__, param_data->state ? "write" : "read");
+	pr_info("%s: set param at %s\n", __func__, param_data->state ? "write" : "read");
 
 	fp = filp_open(NAD_PARAM_NAME, O_RDWR | O_SYNC, 0);
 	if (IS_ERR(fp)) {
@@ -131,7 +128,7 @@ static void sec_nad_param_update(struct work_struct *work)
 
 		/* Rerun workqueue when nad_refer read fail */
 		if (param_data->retry_cnt > param_data->curr_cnt) {
-			NAD_PRINT("retry count : %d\n", param_data->curr_cnt++);
+			pr_info("retry count : %d\n", param_data->curr_cnt++);
 			schedule_delayed_work(&sec_nad_param_data.sec_nad_delay_work, HZ * 1);
 		}
 		return;
@@ -155,8 +152,8 @@ static void sec_nad_param_update(struct work_struct *work)
 		goto close_fp_out;
 	}
 	
-	NAD_PRINT("%s: NAD_LOG_OFFSET %d\n", __func__, ret);	
-#endif	
+	pr_info("%s: NAD_LOG_OFFSET %d\n", __func__, ret);
+#endif
 
 	switch (param_data->state) {
 	case NAD_PARAM_WRITE:
@@ -167,8 +164,7 @@ static void sec_nad_param_update(struct work_struct *work)
 			goto close_fp_out;
 		}
 
-#ifdef NAD_DEBUG
-			NAD_PRINT(
+			pr_info(
 				"NAD factory : %s\n"
 				"NAD result : %s\n"
 				"NAD data : 0x%x\n"
@@ -199,10 +195,10 @@ static void sec_nad_param_update(struct work_struct *work)
 				sec_nad_env.nad_acat_skip_fail,
 				sec_nad_env.unlimited_loop);
 #if defined(CONFIG_SEC_NAD_X)			
-				NAD_PRINT("NAD X : %s\n", sec_nad_env.nad_extend);	
-				NAD_PRINT("sec_nad_env total size : %lu\n", sizeof(sec_nad_env));
+				pr_info("NAD X : %s\n", sec_nad_env.nad_extend);
+				pr_info("sec_nad_env total size : %lu\n", sizeof(sec_nad_env));
 
-				NAD_PRINT(			
+				pr_info(
 				"NADX : %s\n"
 				"NADX result : %s\n"
 				"NADX data : 0x%x\n"
@@ -216,7 +212,7 @@ static void sec_nad_param_update(struct work_struct *work)
 				sec_nad_env.nadx_is_excuted);
 				
 				
-				NAD_PRINT(			
+				pr_info(
 				"NADX SECOND: %s\n"
 				"NADX SECOND result : %s\n"
 				"NADX SECOND data : 0x%x\n"
@@ -226,9 +222,7 @@ static void sec_nad_param_update(struct work_struct *work)
 				sec_nad_env.nad_extend_second_result,
 				sec_nad_env.nad_extend_second_data,
 				sec_nad_env.nad_extend_second_inform2_data,
-				sec_nad_env.nad_extend_second_inform3_data);		
-#endif				
-
+				sec_nad_env.nad_extend_second_inform3_data);
 #endif
 		break;
 	case NAD_PARAM_READ:
@@ -238,14 +232,15 @@ static void sec_nad_param_update(struct work_struct *work)
 			pr_err("%s: read error! %d\n", __func__, ret);
 			goto close_fp_out;
 		}
-#ifdef NAD_DEBUG
-			NAD_PRINT(
+			pr_info(
 				"NAD factory : %s\n"
 				"NAD result : %s\n"
 				"NAD data : 0x%x\n"
+				"NAD DAS : %s BLOCK : %s LEVEL : %d VECTOR : %s\n"
 				"NAD ACAT : %s\n"
 				"NAD ACAT result : %s\n"
 				"NAD ACAT data : 0x%x\n"
+				"NAD ACAT DAS : %s BLOCK : %s LEVEL : %d VECTOR : %s\n"
 				"NAD ACAT loop count : %d\n"
 				"NAD ACAT real count : %d\n"
 				"NAD DRAM test need : %s\n"
@@ -254,12 +249,21 @@ static void sec_nad_param_update(struct work_struct *work)
 				"NAD DRAM test fail address : 0x%08llx\n"
 				"NAD status : %d\n"
 				"NAD ACAT skip fail : %d\n"
-				"NAD unlimited loop : %d\n", sec_nad_env.nad_factory,
+				"NAD unlimited loop : %d\n",
+				sec_nad_env.nad_factory,
 				sec_nad_env.nad_result,
 				sec_nad_env.nad_data,
+				sec_nad_env.nad_fail_info.das_string,
+				sec_nad_env.nad_fail_info.block_string,
+				sec_nad_env.nad_fail_info.level,
+				sec_nad_env.nad_fail_info.vector_string,
 				sec_nad_env.nad_acat,
 				sec_nad_env.nad_acat_result,
 				sec_nad_env.nad_acat_data,
+				sec_nad_env.nad_acat_fail_info.das_string,
+				sec_nad_env.nad_acat_fail_info.block_string,
+				sec_nad_env.nad_acat_fail_info.level,
+				sec_nad_env.nad_acat_fail_info.vector_string,
 				sec_nad_env.nad_acat_loop_count,
 				sec_nad_env.nad_acat_real_count,
 				sec_nad_env.nad_dram_test_need,
@@ -271,23 +275,27 @@ static void sec_nad_param_update(struct work_struct *work)
 				sec_nad_env.unlimited_loop);
 
 #if defined(CONFIG_NAD_55)
-				NAD_PRINT(
+				pr_info(
 				"nad_complete : %s\n",
 				sec_nad_env.nad_complete);
 #endif
-#endif
 
 #if defined(CONFIG_SEC_NAD_X)			
-				NAD_PRINT("NAD X : %s\n", sec_nad_env.nad_extend);	
-				NAD_PRINT("sec_nad_env total size : %lu\n", sizeof(sec_nad_env));
+				pr_info("NAD X : %s\n", sec_nad_env.nad_extend);
+				pr_info("sec_nad_env total size : %lu\n", sizeof(sec_nad_env));
 
-				NAD_PRINT(			
+				pr_info(
 				"NADX : %s\n"
 				"NADX result : %s\n"
 				"NADX data : 0x%x\n"
+				"NADX DAS : %s BLOCK : %s LEVEL : %d VECTOR : %s\n"
 				"NADX nadx_is_excuted : %d\n", sec_nad_env.nad_extend,
 				sec_nad_env.nad_extend_result,
 				sec_nad_env.nad_extend_data,
+				sec_nad_env.nad_extend_fail_info.das_string,
+				sec_nad_env.nad_extend_fail_info.block_string,
+				sec_nad_env.nad_extend_fail_info.level,
+				sec_nad_env.nad_extend_fail_info.vector_string,
 				sec_nad_env.nadx_is_excuted);	
 #endif
 
@@ -296,15 +304,15 @@ static void sec_nad_param_update(struct work_struct *work)
 		if (ret < 0)
 			pr_err("%s: read error! %d\n", __func__, ret);
 			
-		NAD_PRINT("%s: NAD_LOG %s\n", __func__, nad_log_buffer);
+		pr_info("%s: NAD_LOG %s\n", __func__, nad_log_buffer);
 #endif			
 		break;
 	}
 	sec_nad_param_data.nad_param_complete = true;
-	NAD_PRINT("%s: NAD READ COMPLETE \n", __func__);
+	pr_info("%s: NAD READ COMPLETE \n", __func__);
 close_fp_out:
 	if (fp) {
-		NAD_PRINT("%s: close\n", __func__);
+		pr_info("%s: close\n", __func__);
 		filp_close(fp, NULL);
 
 #if defined(CONFIG_SEC_NAD_BPS_CLASSIFIER)
@@ -319,7 +327,7 @@ close_fp_out:
 #endif
 
 
-	NAD_PRINT("%s: exit %d\n", __func__, ret);
+	pr_info("%s: exit %d\n", __func__, ret);
 	return;
 }
 
@@ -352,7 +360,7 @@ static void sec_nad_init_update(struct work_struct *work)
 {
 	int ret = -1;
 
-	NAD_PRINT("%s\n", __func__);
+	pr_info("%s\n", __func__);
 
 	ret = sec_set_nad_param(NAD_PARAM_READ);
 	if (ret < 0)
@@ -371,7 +379,7 @@ static int get_vst_adjust(void)
 
 	vst_adjust = sec_nad_env.vst_info.vst_adjust;
 
-	NAD_PRINT("vst_adjust : 0x%x\n", vst_adjust);
+	pr_info("vst_adjust : 0x%x\n", vst_adjust);
 
 	/* check crc */
 	crc = vst_adjust & 0x3;
@@ -387,7 +395,7 @@ static int get_vst_adjust(void)
 	if (tmp != 0)
 		tmp = 4 - tmp;
 
-	NAD_PRINT(" crc = %d, tmp = %d\n", crc, tmp);
+	pr_info(" crc = %d, tmp = %d\n", crc, tmp);
 
 	if (crc != tmp)
 		return 0;
@@ -402,7 +410,7 @@ static int get_vst_result(void)
 
 	vst_result = sec_nad_env.vst_info.vst_result;
 
-	NAD_PRINT("vst_result : 0x%x\n", vst_result);
+	pr_info("vst_result : 0x%x\n", vst_result);
 
 	/* check magic number */
 	if (((vst_result >> 8) & NAD_VST_MAGIC_MASK) == NAD_VST_MAGIC_NUM)
@@ -419,7 +427,7 @@ static int get_vst_temperature(int block)
 	
 	temperature_sum = sec_nad_env.vst_perform_data[block].temperature_sum;
 	
-	NAD_PRINT("temperature_sum : %d\n", temperature_sum);
+	pr_info("temperature_sum : %d\n", temperature_sum);
 	return temperature_sum;
 }
 
@@ -431,7 +439,7 @@ static int get_vst_operation_time(int block)
 	
 	operation_time= sec_nad_env.vst_perform_data[block].time_sum;
 	
-	NAD_PRINT("operation_time : %d\n", operation_time);
+	pr_info("operation_time : %d\n", operation_time);
 	return operation_time;
 }
 #endif
@@ -446,7 +454,7 @@ int nad_check_rework()
 	
 	rework_info = sec_nad_env.nad_rework_info;
 
-	NAD_PRINT("%s fused nad_rework_info = %d\n", __func__, sec_nad_env.nad_rework_info);
+	pr_info("%s fused nad_rework_info = %d\n", __func__, sec_nad_env.nad_rework_info);
 
 	/* case 1 vst fail */
 	if(( NAD_VST_RESULT_MASK & sec_nad_env.vst_info.vst_f_res) > 0) {
@@ -471,14 +479,24 @@ int nad_check_rework()
 		val = REWORK_RTC_TIME_OVER;
 
 	if (val > 0) {
-		NAD_PRINT("%s new rework_info = %d\n", __func__, val);
+		pr_info("%s new rework_info = %d\n", __func__, val);
 		sec_nad_env.nad_rework_info = val;
 		
 		ret = sec_set_nad_param(NAD_PARAM_WRITE);
-		if (ret < 0)
+		if (ret < 0) {
 			pr_err("%s: write error! %d\n", __func__, ret);
+			return -1;
 		}
-
+	} else {
+			if (rework_info == REWORK_RTC_TIME_OVER) {
+				sec_nad_env.nad_rework_info = 0;
+				ret = sec_set_nad_param(NAD_PARAM_WRITE);
+				if (ret < 0) {
+					pr_err("%s: write error! %d\n", __func__, ret);
+					return -1;
+				}
+			}
+	}
 	if (rework_info > REWORK_START && rework_info < END_OF_REWORK_ITEM)
 		val = -1;
 
@@ -492,7 +510,7 @@ static void make_pmic_data_to_string(void)
 	if (!strlen(nad_ocp_read_result)) {
 		if (sec_nad_env.pmic_ocp_status == NAD_PMIC_FAIL) {
 			strcpy(nad_ocp_read_result, nad_ocp_data[sec_nad_env.pmic_ocp_fail_index]);
-			NAD_PRINT("%s NAD_OCP_RESULT : %s %s\n", __func__,
+			pr_info("%s NAD_OCP_RESULT : %s %s\n", __func__,
 				(sec_nad_env.pmic_ocp_status == 0) ? "pass" : "fail", nad_ocp_read_result);
 		}
 	}
@@ -503,7 +521,7 @@ static void make_pmic_data_to_string(void)
 				strcpy(nad_pmic_read_result, nad_i2c_data[sec_nad_env.pmic_read_channel]);
 			else
 				strcpy(nad_pmic_read_result, nad_speedy_data);
-		NAD_PRINT("%s NAD_PMIC_READ_RESULT : %s %s\n", __func__,
+		pr_info("%s NAD_PMIC_READ_RESULT : %s %s\n", __func__,
 				(sec_nad_env.pmic_read_status == 0) ? "pass" : "fail", nad_pmic_read_result);
 		}
 	}
@@ -527,7 +545,7 @@ static ssize_t show_nad_stat(struct device *dev,
 	make_pmic_data_to_string();
 #endif
 	
-	NAD_PRINT("%s\n", __func__);
+	pr_info("%s\n", __func__);
 	
 
 	if (!strncasecmp(sec_nad_env.nad_result, "FAIL", 4) && !strncasecmp(sec_nad_env.nad_second_result, "FAIL", 4)) {
@@ -875,7 +893,7 @@ static ssize_t show_nad_erase(struct device *dev,
 		struct device_attribute *attr,
 		char *buf)
 {
-	NAD_PRINT("%s\n", __func__);
+	pr_info("%s\n", __func__);
 
 	if (!strncmp(sec_nad_env.nad_factory, "GAP", 3))
 		return sprintf(buf, "OK\n");
@@ -889,7 +907,7 @@ static ssize_t show_nad_acat(struct device *dev,
 		struct device_attribute *attr,
 		char *buf)
 {
-	NAD_PRINT("%s\n", __func__);
+	pr_info("%s\n", __func__);
 
 	/* Check status if ACAT NAD was excuted */
 	if (sec_nad_env.current_nad_status >= NAD_ACAT_FLAG) {
@@ -944,7 +962,7 @@ static ssize_t store_nad_acat(struct device *dev,
 	char *nad_ptr, *string;
 	unsigned int len = 0;
 
-	NAD_PRINT("buf : %s count : %d\n", buf, (int)count);
+	pr_info("buf : %s count : %d\n", buf, (int)count);
 
 	if ((int)count < NAD_BUFF_SIZE)
 		return -EINVAL;
@@ -958,7 +976,7 @@ static ssize_t store_nad_acat(struct device *dev,
 	while (idx < NAD_CMD_LIST) {
 		nad_ptr = strsep(&string, ",");
 		if (nad_ptr ==  NULL || strlen(nad_ptr) >= NAD_BUFF_SIZE) {
-				NAD_PRINT(" %s: invalid input\n",__func__);
+				pr_info(" %s: invalid input\n",__func__);
 				return -EINVAL;	
 		}
 		strcpy(nad_cmd[idx++], nad_ptr);
@@ -990,7 +1008,7 @@ static ssize_t store_nad_acat(struct device *dev,
 #endif
 		/* case 1 : ACAT NAD */
 		if (sec_nad_env.nad_acat_loop_count > 0) {
-			NAD_PRINT("ACAT NAD test command.\n");
+			pr_info("ACAT NAD test command.\n");
 
 			strncpy(sec_nad_env.nad_acat, "ACAT", 4);
 			strncpy(sec_nad_env.nad_acat_second, "DUMM", 4);
@@ -1008,7 +1026,7 @@ static ssize_t store_nad_acat(struct device *dev,
 #if defined(CONFIG_SEC_NAD_X)		
 		if(sec_nad_env.nad_acat_loop_count ==  444)
 		{
-			NAD_PRINT("NADX test command.\n");
+			pr_info("NADX test command.\n");
 
 			strncpy(sec_nad_env.nad_extend, "NADX", 4);
 			strncpy(sec_nad_env.nad_extend_result, "NULL",4);
@@ -1041,7 +1059,7 @@ static ssize_t store_nad_acat(struct device *dev,
 #endif
 		/* case 2 : DRAM test */
 		if (!strncmp(nad_cmd[2], "1", 1)) {
-			NAD_PRINT("DRAM test command.\n");
+			pr_info("DRAM test command.\n");
 
 			strncpy(sec_nad_env.nad_dram_test_need, "DRAM", 4);
 			sec_nad_env.nad_dram_test_result = 0;
@@ -1069,7 +1087,7 @@ static ssize_t show_nad_dram(struct device *dev,
 		struct device_attribute *attr,
 		char *buf)
 {
-	NAD_PRINT("%s\n", __func__);
+	pr_info("%s\n", __func__);
 
 	if (sec_nad_env.nad_dram_test_result == NAD_DRAM_TEST_FAIL)
 		return sprintf(buf, "NG_DRAM_0x%08llx,0x%x\n",
@@ -1263,7 +1281,7 @@ static ssize_t store_nadc_fac_result(struct device *dev,
 	char nadc_cmd[NAD_CMD_LIST-1][NAD_BUFF_SIZE];
 	char *nadc_ptr, *string;
 
-	NAD_PRINT("buf : %s count : %d\n", buf, (int)count);
+	pr_info("buf : %s count : %d\n", buf, (int)count);
 
 	/* Copy buf to nad temp */
 	strncpy(temp, buf, NAD_BUFF_SIZE*2);
@@ -1283,7 +1301,7 @@ static ssize_t store_nadc_fac_result(struct device *dev,
 
 		/* case 1 : ACAT NAD */
 		if (sec_nad_env.fused_nad_custom_data.loop_count > 0) {
-			NAD_PRINT("run NADC command.\n");
+			pr_info("run NADC command.\n");
 			strncpy(sec_nad_env.fused_nad_custom_data.nad_name, "NADC", 4);
 			strncpy(sec_nad_env.fused_nad_custom_data.nad_result, "NULL",4);
 			sec_nad_env.fused_nad_custom_data.nad_init_temp = 0;
@@ -1366,11 +1384,11 @@ static ssize_t store_nad_fac_result(struct device *dev,
 	int param_update = 0;
 	int ret;
 
-	NAD_PRINT("buf : %s count = %d\n", buf, (int)count);	
+	pr_info("buf : %s count = %d\n", buf, (int)count);
 
 	/* check cmd */
 	if (!strncmp(buf, "nadx", 4)) {
-		NAD_PRINT("run NADX command.\n");
+		pr_info("run NADX command.\n");
 		strncpy(sec_nad_env.nad_extend, "NADX", 4);
 		strncpy(sec_nad_env.nad_extend_result, "NULL",4);
 		sec_nad_env.nad_extend_init_temperature = 0;
@@ -1384,7 +1402,7 @@ static ssize_t store_nad_fac_result(struct device *dev,
 		sec_nad_env.nad_extend_skip_fail = 0;
 		param_update = 1;
 	} else if (!strncmp(buf, "mainfail", 8)) {
-		NAD_PRINT("update failed main nad result\n");
+		pr_info("update failed main nad result\n");
 		strncpy(sec_nad_env.nad_extend_result, "MAIN", 4);
 		param_update = 1;
 	}
@@ -1405,7 +1423,7 @@ static ssize_t show_nad_support(struct device *dev,
 		struct device_attribute *attr,
 		char *buf)
 {
-	NAD_PRINT("%s\n", __func__);
+	pr_info("%s\n", __func__);
 
 	if (sec_nad_env.nad_support == NAD_SUPPORT_FLAG)
 #if defined(CONFIG_SEC_NAD_X) && defined(CONFIG_SEC_NAD_C)
@@ -1429,7 +1447,7 @@ static ssize_t store_nad_reboot(struct device *dev,
 	int ret;
 
 	/* check commnad */
-	NAD_PRINT("%s: START\n", __func__);
+	pr_info("%s: START\n", __func__);
 	if (sec_nad_param_data.nad_param_complete == true) {
 		if (!strncmp(buf, "COM", 3)) {
 			strncpy(sec_nad_env.nad_complete, "COM", 3);
@@ -1458,7 +1476,7 @@ static ssize_t show_nad_version(struct device *dev,
 	nad_fw_version = (sec_nad_env.nad_data >> 24) & 0xF;
 
 	memset(chipset_name, 0x0, sizeof(chipset_name));
-	NAD_PRINT("%s\n", __func__);
+	pr_info("%s\n", __func__);
 	
 	if(sec_nad_env.nad_data != 0)
 	{
@@ -1495,12 +1513,12 @@ static void make_result_data_to_string(void)
 {
 	int i = 0;
 
-	NAD_PRINT("%s : api total count(%d)\n", __func__, sec_nad_env.nad_api_total_count);
+	pr_info("%s : api total count(%d)\n", __func__, sec_nad_env.nad_api_total_count);
 
 	/* Make result string if array is empty */
 	if (!strlen(nad_api_result_string)) {
 		for (i = 0; i < sec_nad_env.nad_api_total_count; i++) {
-			NAD_PRINT("%s : name(%s) result(%d)\n", __func__,
+			pr_info("%s : name(%s) result(%d)\n", __func__,
 				sec_nad_env.nad_api_info[i].name, sec_nad_env.nad_api_info[i].result);
 			/* Failed gpio test */
 			if (sec_nad_env.nad_api_info[i].result) {
@@ -1516,7 +1534,7 @@ static ssize_t show_nad_api(struct device *dev,
 		struct device_attribute *attr,
 		char *buf)
 {
-	NAD_PRINT("%s\n", __func__);
+	pr_info("%s\n", __func__);
 
 	/* Check nad api running status */
 	if (sec_nad_env.nad_api_status == MAGIC_NAD_API_SUCCESS) {
@@ -1557,10 +1575,36 @@ static const struct file_operations sec_nad_log_file_ops = {
 .read = sec_nad_log_read_all,
 };
 #endif
+
+static struct attribute *sec_nad_attrs[] = {
+	&dev_attr_nad_stat.attr,
+	&dev_attr_nad_erase.attr,
+	&dev_attr_nad_acat.attr,
+	&dev_attr_nad_dram.attr,
+	&dev_attr_nad_all.attr,
+	&dev_attr_nad_support.attr,
+	&dev_attr_nad_version.attr,
+#if defined(CONFIG_NAD_55)
+	&dev_attr_nad_reboot.attr,
 #endif
+#if defined(CONFIG_SEC_NAD_API)
+	&dev_attr_nad_api.attr,
+#endif
+#if defined(CONFIG_SEC_NAD_C)
+	&dev_attr_nadc_fac_result.attr,
+	&dev_attr_nad_c_run.attr,
+#endif
+#if defined(CONFIG_SEC_NAD_X)
+	&dev_attr_nad_fac_result.attr,
+	&dev_attr_nad_x_run.attr,
+#endif
+	NULL,
+};
 
-
-
+static struct attribute_group sec_nad_attr_group = {
+	.attrs = sec_nad_attrs,
+};
+#endif
 
 static int __init sec_nad_init(void)
 {
@@ -1574,7 +1618,7 @@ static int __init sec_nad_init(void)
 
 	struct device *sec_nad;
 
-	NAD_PRINT("%s\n", __func__);
+	pr_info("%s\n", __func__);
 
 	/* Skip nad init when device goes to lp charging */
 	if (lpcharge)
@@ -1587,98 +1631,20 @@ static int __init sec_nad_init(void)
 		return PTR_ERR(sec_nad);
     }
 
-	ret = device_create_file(sec_nad, &dev_attr_nad_stat);
+	ret = sysfs_create_group(&sec_nad->kobj, &sec_nad_attr_group);
 	if (ret) {
-		pr_err("%s: Failed to create device file\n", __func__);
+		pr_err("%s : could not create sysfs node", __func__);
 		goto err_create_nad_sysfs;
 	}
 
-	ret = device_create_file(sec_nad, &dev_attr_nad_erase);
-	if (ret) {
-		pr_err("%s: Failed to create device file\n", __func__);
-		goto err_create_nad_sysfs;
-	}
-
-	ret = device_create_file(sec_nad, &dev_attr_nad_acat);
-	if (ret) {
-		pr_err("%s: Failed to create device file\n", __func__);
-		goto err_create_nad_sysfs;
-	}
-
-	ret = device_create_file(sec_nad, &dev_attr_nad_dram);
-	if (ret) {
-		pr_err("%s: Failed to create device file\n", __func__);
-		goto err_create_nad_sysfs;
-	}
-
-	ret = device_create_file(sec_nad, &dev_attr_nad_all);
-	if (ret) {
-		pr_err("%s: Failed to create device file\n", __func__);
-		goto err_create_nad_sysfs;
-	}
-
-	ret = device_create_file(sec_nad, &dev_attr_nad_support);
-	if (ret) {
-		pr_err("%s: Failed to create device file\n", __func__);
-		goto err_create_nad_sysfs;
-	}
-#if defined(CONFIG_NAD_55)
-	ret = device_create_file(sec_nad, &dev_attr_nad_reboot);
-	if (ret) {
-		pr_err("%s: Failed to create device file\n", __func__);
-		goto err_create_nad_sysfs;
-	}
-#endif
-
-#if defined(CONFIG_SEC_NAD_API)
-	ret = device_create_file(sec_nad, &dev_attr_nad_api);
-	if (ret) {
-	pr_err("%s: Failed to create device file\n", __func__);
-		goto err_create_nad_sysfs;
-	}
-#endif
-
-#if defined(CONFIG_SEC_NAD_C)
-	ret = device_create_file(sec_nad, &dev_attr_nadc_fac_result);
-	if (ret) {
-		pr_err("%s: Failed to create fac_result file\n", __func__);
-		goto err_create_nad_sysfs;
-	}
-
-	ret = device_create_file(sec_nad, &dev_attr_nad_c_run);
-	if (ret) {
-		pr_err("%s: Failed to create fac_result file\n", __func__);
-		goto err_create_nad_sysfs;
-	}
-#endif
-
-#if defined(CONFIG_SEC_NAD_X)
-	ret = device_create_file(sec_nad, &dev_attr_nad_fac_result);
-	if (ret) {
-		pr_err("%s: Failed to create fac_result file\n", __func__);
-		goto err_create_nad_sysfs;
-	}
-
-	ret = device_create_file(sec_nad, &dev_attr_nad_x_run);
-	if (ret) {
-		pr_err("%s: Failed to create fac_result file\n", __func__);
-		goto err_create_nad_sysfs;
-	}
-#endif
-
-	ret = device_create_file(sec_nad, &dev_attr_nad_version);
-	if (ret) {
-		pr_err("%s: Failed to create device file\n", __func__);
-		goto err_create_nad_sysfs;
-	}
-#if defined(CONFIG_SEC_NAD_LOG)	
+#if defined(CONFIG_SEC_NAD_LOG)
 	entry = proc_create("sec_nad_log", 0440, NULL, &sec_nad_log_file_ops);
 	if (!entry) {
-	pr_err("%s: failed to create proc entry\n", __func__);
-	return 0;
+		pr_err("%s: failed to create proc entry\n", __func__);
+		return 0;
 	}
 	proc_set_size(entry, NAD_LOG_SIZE);
-#endif	
+#endif
 
 	/* Initialize nad param struct */
 	sec_nad_param_data.offset = NAD_ENV_OFFSET;
@@ -1710,7 +1676,7 @@ static void __exit sec_nad_exit(void)
 #if defined(CONFIG_SEC_FACTORY)
 	cancel_work_sync(&sec_nad_param_data.sec_nad_work);
 	cancel_delayed_work(&sec_nad_param_data.sec_nad_delay_work);
-	NAD_PRINT("%s: exit\n", __func__);
+	pr_info("%s: exit\n", __func__);
 #endif
 }
 

@@ -46,10 +46,11 @@
 #define SENSOR_HI847_STREAM_MODE_ADDR			(0x0B00)
 #define SENSOR_HI847_ISP_EN_ADDR					(0x0B04)	//B[8]: PCM, B[5]: Hscaler, B[4]: Digital gain, B[3]: DPC, B[1]: LSC, B[0]: TestPattern
 #define SENSOR_HI847_MIPI_TX_OP_MODE_ADDR		(0x1002)
-#define SENSOR_HI847_ISP_FRAME_CNT_ADDR			(0x1056)
+#define SENSOR_HI847_ISP_PLL_ENABLE_ADDR		(0x0702)
 
 #define SENSOR_HI847_DEBUG_INFO (1)
-#define SENSOR_HI847_PDAF_DISABLE (1)
+#define SENSOR_HI847_PDAF_DISABLE (0)
+#define SENSOR_HI847_OTP_READ (1)
 
 enum sensor_hi847_mode_enum {
 	SENSOR_HI847_3264X2448_30FPS,
@@ -59,6 +60,13 @@ enum sensor_hi847_mode_enum {
 	SENSOR_HI847_MODE_MAX
 };
 
+const u32 sensor_hi847_rev00_mipirate[] = {
+	958,		//SENSOR_HI847_3264X2448_30FPS
+	910,		//SENSOR_HI847_3264X1836_30FPS, REV00 is not supported.
+	455,		//SENSOR_HI847_1632X1224_30FPS, REV00 is not supported.
+	400,		//SENSOR_HI847_1632X1224_60FPS
+};
+
 #define SENSOR_HI847_BRINGUP_VERSION_ID (0x0000)
 #define SENSOR_HI847_BRINGUP_VERSION(cis) ({	\
 	u32 rev;									\
@@ -66,6 +74,5 @@ enum sensor_hi847_mode_enum {
 	rev = cis->cis_data->cis_rev;				\
 	(rev == SENSOR_HI847_BRINGUP_VERSION_ID); \
 })
-
 
 #endif

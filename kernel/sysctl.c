@@ -1393,6 +1393,15 @@ static struct ctl_table vm_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero,
 	},
+#ifdef CONFIG_KSWAPD_PERFTUNE
+	{
+		.procname	= "kswapd_perftune_cpumask",
+		.data		= &kswapd_perftune_cpumask,
+		.maxlen		= sizeof(kswapd_perftune_cpumask),
+		.mode		= 0666,
+		.proc_handler	= sysctl_kswapd_perftune_cpumask_handler,
+	},
+#endif
 #ifdef CONFIG_HUGEPAGE_POOL
 	{
 		.procname	= "use_hugepage_pool_global",

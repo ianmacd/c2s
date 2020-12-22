@@ -131,7 +131,12 @@ static void s3c24xx_serial_rx_fifo_wait(struct s3c24xx_uart_port *ourport);
 unsigned char uart_log_buf[256] = {0, };
 
 /* Allocate 800KB of buffer for UART logging */
+#if defined(CONFIG_MSM_BT_POWER)
+#define LOG_BUFFER_SIZE		(0x320000)
+#else
 #define LOG_BUFFER_SIZE		(0x190000)
+#endif
+
 
 #define LOG_REG_DEBUG_LEN	(91)
 struct s3c24xx_uart_port *panic_port;

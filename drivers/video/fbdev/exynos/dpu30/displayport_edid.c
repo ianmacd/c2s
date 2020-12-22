@@ -927,8 +927,8 @@ int edid_update(u32 sst_id, struct displayport_device *displayport)
 	supported_videos[0].edid_support_match = true; /*default support VGA*/
 	supported_videos[VDUMMYTIMING].dv_timings.bt.width = 0;
 	supported_videos[VDUMMYTIMING].dv_timings.bt.height = 0;
-	supported_videos[VDUMMYTIMING].dex_support = 0;
-	supported_videos[VDUMMYTIMING].ratio = 0;
+	supported_videos[VDUMMYTIMING].dex_support = DEX_NOT_SUPPORT;
+	supported_videos[VDUMMYTIMING].ratio = RATIO_ETC;
 	for (i = 1; i < supported_videos_pre_cnt; i++)
 		supported_videos[i].edid_support_match = false;
 	if (displayport->do_unit_test) {

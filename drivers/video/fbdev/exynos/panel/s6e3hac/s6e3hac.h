@@ -1363,6 +1363,8 @@ static int getidx_dia_onoff_table(struct maptbl *tbl);
 static int getidx_irc_mode_table(struct maptbl *tbl);
 
 static bool is_panel_state_not_lpm(struct panel_device *panel);
+static bool is_brightdot_enabled(struct panel_device *panel);
+static bool is_brightdot_disabled(struct panel_device *panel);
 
 #ifdef CONFIG_SUPPORT_XTALK_MODE
 static int getidx_vgh_table(struct maptbl *);

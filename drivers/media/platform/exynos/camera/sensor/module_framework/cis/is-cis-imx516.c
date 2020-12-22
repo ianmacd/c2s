@@ -1021,7 +1021,7 @@ int sensor_imx516_cis_set_laser_error(struct v4l2_subdev *subdev, u32 mode)
 	int ret = 0;
 	struct is_cis *cis;
 	struct i2c_client *client;
-	int i=0;
+	int i = 0, test_case_length = ARRAY_SIZE(sensor_imx516_laser_testcases);
 	struct sensor_imx516_laser_test test;
 
 	FIMC_BUG(!subdev);
@@ -1037,7 +1037,7 @@ int sensor_imx516_cis_set_laser_error(struct v4l2_subdev *subdev, u32 mode)
 		goto p_err;
 	}
 
-	for(i=0; i < sizeof(sensor_imx516_laser_testcases)/sizeof(sensor_imx516_laser_testcases[0]); i++){
+	for(i = 0; i < test_case_length; i++){
 		test = sensor_imx516_laser_testcases[i];
 
 		if(test.error == mode){

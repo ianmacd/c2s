@@ -358,6 +358,7 @@ static void dpu_bts_find_max_disp_freq(struct decon_device *decon,
 	u32 max_disp_ch_bw;
 	u32 disp_op_freq = 0, freq = 0;
 	struct decon_win_config *config = regs->dpp_config;
+	u32 ref_bw = 0;
 
 	memset(disp_ch_bw, 0, sizeof(disp_ch_bw));
 
@@ -381,11 +382,6 @@ static void dpu_bts_find_max_disp_freq(struct decon_device *decon,
 	decon->bts.peak = max_disp_ch_bw;
 	decon->bts.max_disp_freq = max_disp_ch_bw * 100 / (16 * BUS_UTIL) + 1;
 
-	if (decon->bts.fps == 120) {
-		if (decon->bts.max_disp_freq < 266000)
-			decon->bts.max_disp_freq = 266000;
-	}
-
 	for (i = 0; i < decon->dt.max_win; ++i) {
 		if ((config[i].state != DECON_WIN_STATE_BUFFER) &&
 				(config[i].state != DECON_WIN_STATE_COLOR))
@@ -402,6 +398,20 @@ static void dpu_bts_find_max_disp_freq(struct decon_device *decon,
 
 	if (decon->bts.max_disp_freq < disp_op_freq)
 		decon->bts.max_disp_freq = disp_op_freq;
+
+	if (decon->lcd_info->fps == 120) {
+		/* ref_bw : 1-layer 32bpp format */
+		ref_bw = decon->bts.resol_clk * 4;
+		if ((max_disp_ch_bw > ref_bw) &&
+				(decon->bts.max_disp_freq < 266000))
+			decon->bts.max_disp_freq = 266000;
+	}
+#if defined(CONFIG_EXYNOS_DISPLAYPORT)
+	if (decon->dt.out_type == DECON_OUT_DP) {
+		if (decon->bts.max_disp_freq < 200000)
+			decon->bts.max_disp_freq = 200000;
+	}
+#endif
 
 	DPU_DEBUG_BTS("\tMAX DISP CH FREQ = %d\n", decon->bts.max_disp_freq);
 }
@@ -723,7 +733,7 @@ void dpu_bts_acquire_bw(struct decon_device *decon)
 			DPU_ERR_BTS("%s int qos setting error\n", __func__);
 
 		if (pm_qos_request_active(&decon->bts.disp_qos))
-			pm_qos_update_request(&decon->bts.disp_qos, 400 * 1000);
+			pm_qos_update_request(&decon->bts.disp_qos, 533 * 1000);
 		else
 			DPU_ERR_BTS("%s int qos setting error\n", __func__);
 

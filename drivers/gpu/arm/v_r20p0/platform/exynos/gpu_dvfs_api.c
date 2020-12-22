@@ -471,7 +471,9 @@ int gpu_dvfs_init_time_in_state(void)
 
 	for (i = gpu_dvfs_get_level(platform->gpu_max_clock); i <= gpu_dvfs_get_level(platform->gpu_min_clock); i++) {
 		platform->table[i].time = 0;
+#ifdef CONFIG_MALI_TSG
 		platform->table[i].time_busy = 0;
+#endif
 	}
 #endif /* CONFIG_MALI_DEBUG_SYS */
 
@@ -496,9 +498,11 @@ int gpu_dvfs_update_time_in_state(int clock)
 	current_time = get_jiffies_64();
 	if ((level >= gpu_dvfs_get_level(platform->gpu_max_clock)) && (level <= gpu_dvfs_get_level(platform->gpu_min_clock))) {
 		platform->table[level].time += current_time-prev_time;
+#ifdef CONFIG_MALI_TSG
 		platform->table[level].time_busy += (unsigned long)((current_time-prev_time) * platform->env_data.utilization);	/* it has to divide 100 */
 		GPU_LOG(DVFS_DEBUG, DUMMY, 0u, 0u, "%s: util = %d cur_clock[%d] = %d time_busy[%d] = %llu(%llu)\n",
 				__func__, platform->env_data.utilization, level, clock, level, platform->table[level].time_busy / 100, platform->table[level].time);
+#endif
 	}
 
 	prev_time = current_time;
@@ -630,6 +634,7 @@ int gpu_dvfs_get_clock(int level)
 
 	return platform->table[level].clock;
 }
+EXPORT_SYMBOL_GPL(gpu_dvfs_get_clock);
 
 int gpu_dvfs_get_step(void)
 {
@@ -640,6 +645,7 @@ int gpu_dvfs_get_step(void)
 
 	return platform->table_size;
 }
+EXPORT_SYMBOL_GPL(gpu_dvfs_get_step);
 
 int gpu_dvfs_get_cur_clock(void)
 {
@@ -711,34 +717,14 @@ int gpu_dvfs_get_max_freq(void)
 }
 EXPORT_SYMBOL_GPL(gpu_dvfs_get_max_freq);
 
-int gpu_dvfs_get_sustainable_info_array(int index)
-{
-        struct kbase_device *kbdev = pkbdev;
-        struct exynos_context *platform = (struct exynos_context *) kbdev->platform_context;
-
-        DVFS_ASSERT(platform);
-
-        return platform->sustainable.info_array[index];
-}
-
-int gpu_dvfs_get_max_lock(void)
-{
-        struct kbase_device *kbdev = pkbdev;
-        struct exynos_context *platform = (struct exynos_context *) kbdev->platform_context;
-
-        DVFS_ASSERT(platform);
-
-        return platform->max_lock;
-}
-
 #ifdef CONFIG_MALI_SEC_NEGATIVE_BOOST
 bool gpu_dvfs_get_need_cpu_qos(void)
 {
-	struct kbase_device *kbdev = pkbdev;
-	struct exynos_context *platform = (struct exynos_context *) kbdev->platform_context;
+        struct kbase_device *kbdev = pkbdev;
+        struct exynos_context *platform = (struct exynos_context *) kbdev->platform_context;
 	bool need_cpu_qos = false;
 
-	DVFS_ASSERT(platform);
+        DVFS_ASSERT(platform);
 
 	if (platform->need_cpu_qos
 		&& ((platform->min_lock == 377000 && platform->max_lock == 377000)
@@ -747,12 +733,53 @@ bool gpu_dvfs_get_need_cpu_qos(void)
 
 	return need_cpu_qos;
 }
+#else
+bool gpu_dvfs_get_need_cpu_qos(void)
+{
+	return false;
+}
 #endif
+
+#ifdef CONFIG_MALI_SUSTAINABLE_OPT
+int gpu_dvfs_get_sustainable_info_array(int index)
+{
+        struct kbase_device *kbdev = pkbdev;
+        struct exynos_context *platform = (struct exynos_context *) kbdev->platform_context;
+
+        DVFS_ASSERT(platform);
+
+	return platform->sustainable.info_array[index];
+}
+
+#ifdef CONFIG_MALI_DVFS
+int gpu_dvfs_get_max_lock(void)
+{
+	struct kbase_device *kbdev = pkbdev;
+	struct exynos_context *platform = (struct exynos_context *) kbdev->platform_context;
+
+	DVFS_ASSERT(platform);
+
+	return platform->max_lock;
+}
+#endif
+#else
+int gpu_dvfs_get_sustainable_info_array(int index)
+{
+	CSTD_UNUSED(index);
+	return 0;
+}
+
+#ifdef CONFIG_MALI_DVFS
+int gpu_dvfs_get_max_lock(void)
+{
+	return 0;
+}
+#endif
+#endif /* CONFIG_MALI_SUSTAINABLE_OPT */
 
 int exynos_stats_get_gpu_coeff(void)
 {
 	int coef = 6144;
-	
 	return coef;
 }
 
@@ -801,6 +828,7 @@ unsigned int *exynos_stats_get_gpu_volt_table(void)
 
 	return volts;
 }
+EXPORT_SYMBOL(exynos_stats_get_gpu_volt_table);
 
 static ktime_t time_in_state[DVFS_TABLE_ROW_MAX];
 ktime_t *exynos_stats_get_gpu_time_in_state(void)
@@ -813,14 +841,20 @@ ktime_t *exynos_stats_get_gpu_time_in_state(void)
 	DVFS_ASSERT(platform->table);
 
 	for (i = gpu_dvfs_get_level(platform->gpu_max_clock); i <= gpu_dvfs_get_level(platform->gpu_min_clock); i++) {
-		/* time_in_state[i - gpu_dvfs_get_level(platform->gpu_max_clock)] = ms_to_ktime((u64)(platform->table[i].time * 4)); */
+#ifdef CONFIG_MALI_TSG
 		time_in_state[i - gpu_dvfs_get_level(platform->gpu_max_clock)] = ms_to_ktime((u64)(platform->table[i].time_busy * 4) / 100);
+#else
+		time_in_state[i - gpu_dvfs_get_level(platform->gpu_max_clock)] = ms_to_ktime((u64)(platform->table[i].time * 4));
+#endif /* CONFIG_MALI_TSG */
 	}
 
 	return time_in_state;
 }
 EXPORT_SYMBOL(exynos_stats_get_gpu_time_in_state);
 
+
+
+#ifdef CONFIG_MALI_DVFS
 int exynos_stats_get_gpu_max_lock(void)
 {
 	struct kbase_device *kbdev = pkbdev;
@@ -858,13 +892,28 @@ int exynos_stats_get_gpu_min_lock(void)
 	return locked_clock;
 }
 EXPORT_SYMBOL(exynos_stats_get_gpu_min_lock);
+#else
+int exynos_stats_get_gpu_max_lock(void)
+{
+	return 0;
+}
+EXPORT_SYMBOL(exynos_stats_get_gpu_max_lock);
 
+int exynos_stats_get_gpu_min_lock(void)
+{
+	return 0;
+}
+EXPORT_SYMBOL(exynos_stats_get_gpu_min_lock);
+#endif /* CONFIG_MALI_DVFS */
+
+#ifdef CONFIG_MALI_TSG
 unsigned long exynos_stats_get_job_state_cnt(void)
 {
 	struct kbase_device *kbdev = pkbdev;
 
 	return kbdev->input_job_nr_acc;
 }
+EXPORT_SYMBOL(exynos_stats_get_job_state_cnt);
 
 int exynos_stats_set_queued_threshold_0(unsigned int threshold)
 {
@@ -911,6 +960,7 @@ void exynos_stats_set_gpu_polling_speed(int polling_speed)
 	}
 	platform->polling_speed = polling_speed;
 }
+EXPORT_SYMBOL(exynos_stats_set_gpu_polling_speed);
 
 int exynos_stats_get_gpu_polling_speed(void)
 {
@@ -921,16 +971,7 @@ int exynos_stats_get_gpu_polling_speed(void)
 
 	return platform->polling_speed;
 }
-
-#if 1 /* WA_FRAME_CNT */
-int gpu_dvfs_get_wa_frame_cnt(void)
-{
-	struct kbase_device *kbdev = pkbdev;
-	struct exynos_context *platform = (struct exynos_context *) kbdev->platform_context;
-	DVFS_ASSERT(platform);
-	return platform->wa_frame_cnt;
-}
-#endif
+EXPORT_SYMBOL(exynos_stats_get_gpu_polling_speed);
 
 void exynos_migov_set_mode(int mode)
 {
@@ -951,3 +992,15 @@ void exynos_migov_set_gpu_margin(int margin)
 	platform->freq_margin = margin;
 }
 EXPORT_SYMBOL(exynos_migov_set_gpu_margin);
+#endif /* CONFIG_MALI_TSG */
+
+#if 1 /* WA_FRAME_CNT */
+int gpu_dvfs_get_wa_frame_cnt(void)
+{
+	struct kbase_device *kbdev = pkbdev;
+	struct exynos_context *platform = (struct exynos_context *) kbdev->platform_context;
+	DVFS_ASSERT(platform);
+	return platform->wa_frame_cnt;
+}
+#endif
+

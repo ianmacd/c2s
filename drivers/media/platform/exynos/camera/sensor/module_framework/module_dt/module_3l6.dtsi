@@ -130,6 +130,7 @@
 						/* A start node number should be over the 10 for reserved number 0~9. */
 						/* pname = "name";		pin = <act value dealy voltage>;	gpio = <gpx# # 0x1>; */
 						10 { pname = "VDDIO_1.8V_CAM";	pin = <PIN_REGULATOR 1 3000>;		share = <SRT_ACQUIRE SHARED_PIN0 1>;	};
+						20 { pname = "on_i2c";					pin = <PIN_I2C 1 0>; 					};
 					};
 
 					scenario_read_rom_off {
@@ -138,7 +139,8 @@
 
 						/* A start node number should be over the 10 for reserved number 0~9. */
 						/* pname = "name";		pin = <act value dealy voltage>;	gpio = <gpx# # 0x1>; */
-						10 { pname = "VDDIO_1.8V_CAM";		pin = <PIN_REGULATOR 0 0>;	share = <SRT_RELEASE SHARED_PIN0 0>;	};
+						10 { pname = "off_i2c";					pin = <PIN_I2C 0 0>;					};
+						20 { pname = "VDDIO_1.8V_CAM";		pin = <PIN_REGULATOR 0 20000>;	share = <SRT_RELEASE SHARED_PIN0 0>;	};
 					};
 
 					scenario_vision_on {

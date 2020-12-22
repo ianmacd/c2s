@@ -121,6 +121,10 @@ enum sec_reset_reason {
 	SEC_RESET_SET_PARAM   = (SEC_RESET_SET_PREFIX | 0x70000),
 #endif
 	SEC_RESET_SET_DUMPSINK	   = (SEC_RESET_SET_PREFIX | 0x80000),
+#if defined(CONFIG_ARM_EXYNOS_ACME_DISABLE_BOOT_LOCK) && defined(CONFIG_ARM_EXYNOS_DEVFREQ_DISABLE_BOOT_LOCK)
+	SEC_RESET_CLKCHANGE_TEST   = (SEC_RESET_SET_PREFIX | 0x90000),
+#endif
+	SEC_RESET_SET_DRAM         = (SEC_RESET_SET_PREFIX | 0xa0000),
 	SEC_RESET_SET_MULTICMD     = SEC_RESET_MULTICMD_PREFIX,
 };
 
@@ -343,6 +347,10 @@ static void sec_reboot(enum reboot_mode reboot_mode, const char *cmd)
 		else if (!strcmp(cmd, "user_dram_test") && sec_abc_get_enabled())
 			exynos_pmu_write(SEC_DEBUG_PANIC_INFORM, SEC_RESET_USER_DRAM_TEST);
 #endif
+#if defined(CONFIG_ARM_EXYNOS_ACME_DISABLE_BOOT_LOCK) && defined(CONFIG_ARM_EXYNOS_DEVFREQ_DISABLE_BOOT_LOCK)
+		else if (!strcmp(cmd, "clkchange_test"))
+			exynos_pmu_write(SEC_DEBUG_PANIC_INFORM, SEC_RESET_CLKCHANGE_TEST);
+#endif
 		else if (!strncmp(cmd, "emergency", 9))
 			exynos_pmu_write(SEC_DEBUG_PANIC_INFORM, SEC_RESET_REASON_EMERGENCY);
 		else if (!strncmp(cmd, "debug", 5) && !kstrtoul(cmd + 5, 0, &value))
@@ -355,6 +363,8 @@ static void sec_reboot(enum reboot_mode reboot_mode, const char *cmd)
 			exynos_pmu_write(SEC_DEBUG_PANIC_INFORM, SEC_RESET_SET_SWSEL | value);
 		else if (!strncmp(cmd, "sud", 3) && !kstrtoul(cmd + 3, 0, &value))
 			exynos_pmu_write(SEC_DEBUG_PANIC_INFORM, SEC_RESET_SET_SUD | value);
+		else if (!strncmp(cmd, "dram", 4) && !kstrtoul(cmd + 4, 0, &value))
+			exynos_pmu_write(SEC_DEBUG_PANIC_INFORM, SEC_RESET_SET_DRAM | value);
 		else if (!strncmp(cmd, "multicmd:", 9))
 			sec_multicmd(cmd);
 #if defined(CONFIG_SEC_SYSUP)

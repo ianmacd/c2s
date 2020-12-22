@@ -76,6 +76,7 @@ enum {
 #define BBD_CTRL_GPS_ON		"GPSD:CORE_ON"
 #define BBD_CTRL_GPS_OFF		"GPSD:CORE_OFF"
 #define BBD_CTRL_LHD_STOP		"LHD:STOP"
+#define BBD_CTRL_ANDROID_VERSION "SSP:ANDROID_VERSION:"
 //#define DEBUG_1HZ_STAT
 
 #define HSI_ERROR_STATUS              0x2C
@@ -136,6 +137,7 @@ void bbd_enable_stat(void);
 void bbd_disable_stat(void);
 #endif
 
+extern int android_version;
 
 /** callback for incoming data from 477x to senser hub driver **/
 typedef struct {

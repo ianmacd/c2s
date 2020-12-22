@@ -481,11 +481,10 @@ int fr_req_manager(int msgid, struct npu_frame *frame)
 		msg.length = sizeof(struct command);
 		break;
 	case NPU_FRAME_CMD_PROFILER:
-		npu_dbg("profiler enable: %d\n", frame->output->profiler->level);
 		cmd.c.process.oid = frame->uid;
 		cmd.c.process.fid = frame->frame_id;
 		cmd.c.process.priority = frame->priority;
-		cmd.c.process.profiler_ctrl = frame->output->profiler->level;
+		cmd.c.process.profiler_ctrl = frame->output->timestamp[5].tv_sec;
 		cmd.length = frame->mbox_process_dat.address_vector_cnt;
 		cmd.payload = frame->mbox_process_dat.address_vector_start_daddr;
 		msg.command = COMMAND_PROCESS;
@@ -597,7 +596,6 @@ int fr_rslt_manager(int *ret_msgid, struct npu_frame *frame)
 	if (msg.command == COMMAND_DONE) {
 		npu_dbg("COMMAND_DONE for mid: (%d)\n", msg.mid);
 		if (cmd.c.done.duration > 0) {
-			npu_info("receive firmware duration : %d\n", cmd.c.done.duration);
 			frame->duration	= cmd.c.done.duration;
 		}
 		frame->result_code = NPU_ERR_NO_ERROR;

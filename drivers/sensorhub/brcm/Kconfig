@@ -680,6 +680,14 @@ config SENSORS_SSP_R8
 	  To compile this driver as a module, choose M here: the
 	  module will be called ssp.
 
+config SENSORS_SABC
+	tristate "R8 Project"
+	default n
+	depends on SPI
+	help
+		If you have to use sABC alogorithm, 
+		it should be set, it use camera lux.
+
 config SSP_MOTOR_CALLBACK
 	tristate "Sensors support motor"
 	default n

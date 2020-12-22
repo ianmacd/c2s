@@ -6,6 +6,8 @@
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 
+#include <kunit/mock.h>
+
 #include "mcps_sauron.h"
 
 enum {

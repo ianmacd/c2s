@@ -1,8 +1,7 @@
 #ifndef IS_VENDOR_CONFIG_RST_V08_H
 #define IS_VENDOR_CONFIG_RST_V08_H
 
-#include "is-eeprom-rear-2ld_v015.h"
-#include "is-eeprom-front-3j1_v006.h"
+#include "is-eeprom-rear-2ld_v019.h"
 
 #define VENDER_PATH
 
@@ -14,6 +13,7 @@
 #define CAMERA_REAR3
 #define CAMERA_REAR3_AFCAL
 #define CAMERA_REAR3_TILT
+#define CAMERA_REAR3_MODULEID
 
 #define CAMERA_USE_OIS_VDD_1_8V
 
@@ -79,15 +79,22 @@
 #define REAR_TOF_ROM_ID ROM_ID_REAR3
 #endif
 
-#define USE_BUCK2_REGULATOR_CONTROL
-
-#define LEDS_S2MPB02_ADAPTIVE_MOVIE_CURRENT 120
-
 #define USE_SENSOR_LONG_EXPOSURE_SHOT
 
 #define OIS_DUAL_CAL_DEFAULT_VALUE_WIDE 0
 #define OIS_DUAL_CAL_DEFAULT_VALUE_TELE 0
 
-// #define USE_FAKE_RETENTION
+#define USE_MCU_SPI_PUD_SETTING
 
+// #define USE_FAKE_RETENTION
+#define USE_CAMFW_POLICY_ED38
+#define CAMERA_FRONT_FIXED_FOCUS
+
+/*
+ * Issue : When 2ld camera open, I2C SCL signal rarely keep LOW especially on certain devices due to long falling time of VDDIO.
+ * Solution : Add additional delay between rom_power_off and prepare_retention to make sure VDDIO is LOW during the boot.
+ */
+#define CAMERA_USE_COMMON_VDDIO
+
+#define TELE_OIS_TILT_ROM_ID 4
 #endif /* IS_VENDOR_CONFIG_CNT_V01_H */

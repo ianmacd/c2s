@@ -42,7 +42,7 @@
 #include "is-cis-imx616-setB.h"
 
 #include "is-helper-i2c.h"
-#ifdef CONFIG_VENDER_MCD_V2
+#ifdef CONFIG_VENDER_MCD
 #include "is-sec-define.h"
 #endif
 
@@ -246,20 +246,21 @@ int sensor_imx616_cis_cal_dump(char* name, char *buf, size_t size)
 
 	struct file *fp;
 	ssize_t tx = -ENOENT;
-	int fd, old_mask;
+	int fd;
+	//int old_mask;
 	loff_t pos = 0;
 	mm_segment_t old_fs;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	old_mask = sys_umask(0);
+	//old_mask = sys_umask(0);
 
-	sys_rmdir(name);
-	fd = sys_open(name, O_WRONLY | O_CREAT | O_TRUNC | O_SYNC, 0666);
+	ksys_rmdir(name);
+	fd = ksys_open(name, O_WRONLY | O_CREAT | O_TRUNC | O_SYNC, 0666);
 	if (fd < 0) {
 		err("open file error(%d): %s", fd, name);
-		sys_umask(old_mask);
+		//sys_umask(old_mask);
 		set_fs(old_fs);
 		ret = -EINVAL;
 		goto p_err;
@@ -279,8 +280,8 @@ int sensor_imx616_cis_cal_dump(char* name, char *buf, size_t size)
 		err("fail to get file *: %s", name);
 	}
 
-	sys_close(fd);
-	sys_umask(old_mask);
+	ksys_close(fd);
+	//sys_umask(old_mask);
 	set_fs(old_fs);
 
 p_err:
@@ -291,18 +292,21 @@ p_err:
 int sensor_imx616_cis_QuadSensCal_write(struct v4l2_subdev *subdev)
 {
 	int ret = 0;
-	struct is_cis *cis;
+	struct is_cis *cis = NULL;
+	struct is_rom_info *finfo = NULL;
 	struct i2c_client *client = NULL;
 	struct is_device_sensor_peri *sensor_peri = NULL;
 
 	int position;
-	u16 start_addr;
-	u16 data_size;
 
-	ulong cal_addr;
-	u8 cal_data[SENSOR_IMX616_QUAD_SENS_CAL_SIZE] = {0, };
+	u8 *cal_addr;
+	u8 *cal_data = NULL;
+	size_t cal_size;
 
-#ifdef CONFIG_VENDER_MCD_V2
+	u16 qsc_start_addr;
+	u16 qsc_data_size;
+
+#ifdef CONFIG_VENDER_MCD
 	char *rom_cal_buf = NULL;
 #else
 	struct is_lib_support *lib = &gPtr_lib_support;
@@ -325,47 +329,69 @@ int sensor_imx616_cis_QuadSensCal_write(struct v4l2_subdev *subdev)
 
 	position = sensor_peri->module->position;
 
-#ifdef CONFIG_VENDER_MCD_V2
-	ret = is_sec_get_cal_buf(position, &rom_cal_buf);
-
+#ifdef CONFIG_VENDER_MCD
+	ret = is_sec_get_sysfs_finfo(&finfo, position);
 	if (ret < 0) {
 		goto p_err;
 	}
 
-	cal_addr = (ulong)rom_cal_buf;
+	if (!test_bit(IS_ROM_STATE_CAL_READ_DONE, &finfo->rom_state)) {
+		err("eeprom read fail status, skip imx616 QSC write");
+		return 0;
+	}
+
+	ret = is_sec_get_cal_buf(&rom_cal_buf, position);
+	if (ret < 0) {
+		goto p_err;
+	}
+
+	cal_addr = (u8 *)rom_cal_buf;
 	 if (position == SENSOR_POSITION_FRONT) {
-		cal_addr += SENSOR_IMX616_QUAD_SENS_CAL_BASE_FRONT;
+		cal_addr += finfo->rom_xtc_cal_data_start_addr;
 	} else {
 		err("cis_imx616 position(%d) is invalid!\n", position);
 		goto p_err;
 	}
 #else
 	if (position == SENSOR_POSITION_FRONT){
-		cal_addr = lib->minfo->kvaddr_cal[position] + SENSOR_IMX616_QUAD_SENS_CAL_BASE_FRONT;
+		cal_addr = lib->minfo->kvaddr_cal[position] + finfo->rom_xtc_cal_data_start_addr;
 	}else {
 		err("cis_imx616 position(%d) is invalid!\n", position);
 		goto p_err;
 	}
 #endif
 
-	memcpy(cal_data, (u16 *)cal_addr, SENSOR_IMX616_QUAD_SENS_CAL_SIZE);
+	cal_size = (size_t)finfo->rom_xtc_cal_data_size;
+
+	cal_data = kzalloc(cal_size, GFP_KERNEL);
+	if (!cal_data) {
+		err("cis_imx616 memory alloc failed.");
+		kfree(cal_data);
+		goto p_err;
+	}
+
+ 	memcpy(cal_data, cal_addr, cal_size);
 
 #if SENSOR_IMX616_CAL_DEBUG
-	ret = sensor_imx616_cis_cal_dump(SENSOR_IMX616_QSC_DUMP_NAME, (char *)cal_data, (size_t)SENSOR_IMX616_QUAD_SENS_CAL_SIZE);
+	ret = sensor_imx616_cis_cal_dump(SENSOR_IMX616_QSC_DUMP_NAME, cal_addr, cal_size);
 	CHECK_ERR_GOTO(ret < 0, p_err, "cis_imx616 QSC Cal dump fail(%d)!\n", ret);
 #endif
 
-	start_addr = REG(QUAD_SENS_REG);
-	data_size = SENSOR_IMX616_QUAD_SENS_CAL_SIZE;
+	qsc_start_addr = REG(QUAD_SENS_REG);
+	qsc_data_size = finfo->rom_xtc_cal_data_addr_list[SENSOR_IMX616_LSC_CAL_INDEX] -
+					finfo->rom_xtc_cal_data_addr_list[SENSOR_IMX616_QSC_CAL_INDEX] + 1;
 
 	I2C_MUTEX_LOCK(cis->i2c_lock);
 
-	ret = is_sensor_write8_sequential(client, start_addr, cal_data, data_size);
+	ret = is_sensor_write8_sequential(client, qsc_start_addr, cal_data, qsc_data_size);
 	if (ret < 0) {
 		err("cis_imx616 QSC write Error(%d)\n", ret);
 	}
 
 	I2C_MUTEX_UNLOCK(cis->i2c_lock);
+
+	if (cal_data)
+		kfree(cal_data);
 
 p_err:
 	return ret;
@@ -465,7 +491,6 @@ int sensor_imx616_cis_init(struct v4l2_subdev *subdev)
 	}
 
 	FIMC_BUG(!cis->cis_data);
-	memset(cis->cis_data, 0, sizeof(cis_shared_data));
 
 	info("[%s] init %s\n", __func__, cis->use_3hdr ? "(Use 3HDR)" : "");
 	cis->rev_flag = false;
@@ -528,7 +553,7 @@ int sensor_imx616_cis_init(struct v4l2_subdev *subdev)
 	dbg_sensor(1, "[%s] max dgain : %d\n", __func__, setinfo.return_value);
 #endif
 
-#if SENSOR_IMX616_SENSOR_CAL_FOR_REMOSAIC
+#if 0 /* SENSOR_IMX616_SENSOR_CAL_FOR_REMOSAIC */  /* move to mode_change */
 	if (sensor_imx616_cal_write_flag == false) {
 		sensor_imx616_cal_write_flag = true;
 
@@ -753,7 +778,7 @@ int sensor_imx616_cis_mode_change(struct v4l2_subdev *subdev, u32 mode)
 		info("[%s] cis_rev=%#x\n", __func__, cis->cis_data->cis_rev);
 	}
 
-#if 0 /* SENSOR_IMX616_SENSOR_CAL_FOR_REMOSAIC */
+#if SENSOR_IMX616_SENSOR_CAL_FOR_REMOSAIC
 	if (IS_REMOSAIC(mode) && sensor_imx616_cal_write_flag == false) {
 		sensor_imx616_cal_write_flag = true;
 

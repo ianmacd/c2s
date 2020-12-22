@@ -17,7 +17,7 @@
 #include "../panel_poc.h"
 
 #define CANVAS1_POC_IMG_ADDR	(0)
-#define CANVAS1_POC_IMG_SIZE	(327680)
+#define CANVAS1_POC_IMG_SIZE	(390528)
 
 /* partition consists of DATA, CHECKSUM and MAGICNUM */
 static struct poc_partition canvas1_poc_partition[] = {
@@ -30,7 +30,7 @@ static struct poc_partition canvas1_poc_partition[] = {
 };
 
 static struct panel_poc_data s6e3fa9_canvas1_poc_data = {
-	.version = 3,
+	.version = 4,
 	.partition = canvas1_poc_partition,
 	.nr_partition = ARRAY_SIZE(canvas1_poc_partition),
 #ifdef CONFIG_SUPPORT_POC_SPI

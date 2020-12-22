@@ -23,6 +23,7 @@ obj-$(CONFIG_SUPPORT_DISPLAY_PROFILER) += \
 	display_profiler/display_profiler.o \
 	display_profiler/maskgen.o
 obj-$(CONFIG_SUPPORT_MAFPC) += mafpc/mafpc_drv.o
+obj-$(CONFIG_PANEL_DECON_BOARD) += decon_board.o
 
 #
 # Panel and DDI(display driver ic) Device Drivers

@@ -53,8 +53,10 @@ inline void csi_frame_start_inline(struct is_device_csi *csi)
 			if (inc > 1) {
 				mwarn("[CSI%d] interrupt lost(%d)", csi, csi->ch, inc);
 			} else if (inc == 0) {
+#if 0
 				mwarn("[CSI%d] hw_fcount(%d) is not incresed",
 					csi, csi->ch, hw_fcount);
+#endif
 				inc = 1;
 			}
 		}
@@ -208,6 +210,11 @@ static inline void csi_s_output_dma(struct is_device_csi *csi, u32 vc, bool enab
 	csi_hw_s_output_dma(csi->vc_reg[csi->scm][vc], vc, enable);
 }
 
+static inline void csi_s_frameptr(struct is_device_csi *csi, u32 vc, u32 number, bool clear)
+{
+	csi_hw_s_frameptr(csi->vc_reg[csi->scm][vc], vc, number, clear);
+}
+
 static void csi_s_buf_addr_wrap(void *data, unsigned long id, struct is_frame *frame)
 {
 	struct is_device_csi *csi;
@@ -217,6 +224,13 @@ static void csi_s_buf_addr_wrap(void *data, unsigned long id, struct is_frame *f
 	if (!csi) {
 		err("failed to get CSI");
 		return;
+	}
+
+	/* Move frameptr for shadowing N+1 frame DVA update */
+	if (csi->f_id_dec && (vc == CSI_VIRTUAL_CH_0)) {
+		u32 frameptr = atomic_inc_return(&csi->bufring_cnt) % BUF_SWAP_CNT;
+		frameptr *= csi->dma_batch_num;
+		csi_s_frameptr(csi, vc, frameptr, false);
 	}
 
 	csi_s_buf_addr(csi, frame, vc);
@@ -293,11 +307,6 @@ static inline void csi_s_multibuf_addr(struct is_device_csi *csi, struct is_fram
 
 	csi_hw_s_multibuf_dma_addr(csi->vc_reg[csi->scm][vc], vc, index,
 				(u32)frame->dvaddr_buffer[0]);
-}
-
-static inline void csi_s_frameptr(struct is_device_csi *csi, u32 vc, u32 number, bool clear)
-{
-	csi_hw_s_frameptr(csi->vc_reg[csi->scm][vc], vc, number, clear);
 }
 
 static struct is_framemgr *csis_get_vc_framemgr(struct is_device_csi *csi, u32 vc)
@@ -903,7 +912,7 @@ static void csi_err_print(struct is_device_csi *csi)
 				is_sec_copy_err_cnt_to_file();
 #endif
 #endif
-				exynos_bcm_dbg_stop(CAMERA_DRIVER);
+				exynos_bcm_dbg_stop(PANIC_HANDLE);
 
 				is_debug_s2d(false, "[DMA%d][VC P%d, L%d] CSIS error!! %s",
 					csi->dma_subdev[vc]->dma_ch[csi->scm],
@@ -1439,13 +1448,8 @@ static irqreturn_t is_isr_csi_dma(int irq, void *data)
 		}
 
 		if (dma_frame_str & (1 << vc)) {
-			if (csi->f_id_dec && (vc == CSI_VIRTUAL_CH_0)) {
-				int bufring_cnt = atomic_inc_return(&csi->bufring_cnt);
-				u32 number = csi->dma_batch_num * (bufring_cnt % BUF_SWAP_CNT);
-
-				csi_s_frameptr(csi, vc, number, false);
+			if (csi->f_id_dec && (vc == CSI_VIRTUAL_CH_0))
 				csi_frame_start_inline(csi);
-			}
 
 			dma_subdev = csi->dma_subdev[vc];
 
@@ -2131,8 +2135,11 @@ static int csi_stream_on(struct v4l2_subdev *subdev,
 		}
 	}
 
-	/* if sensor's output otf was enabled, enable line irq */
-	if (!test_bit(IS_SENSOR_OTF_OUTPUT, &device->state)) {
+	/*
+	 * A csis line interrupt does not used any more in actual scenario.
+	 * But it can be used for debugging.
+	 */
+	if (unlikely(debug_csi >= 5)) {
 		/* update line_fcount for sensor_notify_by_line */
 		device->line_fcount = atomic_read(&csi->fcount) + 1;
 		minfo("[CSI%d] start line irq cnt(%d)\n", csi, csi->ch, device->line_fcount);
@@ -2223,7 +2230,7 @@ static int csi_stream_off(struct v4l2_subdev *subdev,
 	atomic_dec(&csi_dma->rcount);
 	spin_unlock(&csi_dma->barrier);
 
-	if (!test_bit(IS_SENSOR_OTF_OUTPUT, &device->state))
+	if (csi->tasklet_csis_line.func)
 		tasklet_kill(&csi->tasklet_csis_line);
 
 	if (test_bit(CSIS_DMA_ENABLE, &csi->state)) {

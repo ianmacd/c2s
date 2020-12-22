@@ -3326,6 +3326,19 @@ static void sec_ts_read_info_work(struct work_struct *work)
 	ret = sec_tclm_check_cal_case(ts->tdata);
 	input_info(true, &ts->client->dev, "%s: sec_tclm_check_cal_case ret: %d \n", __func__, ret);
 
+	if (ts->plat_data->support_multi_cal) {
+		if (ts->tdata2->nvdata.cal_count == 0xFF || ts->tdata2->nvdata.cal_position >= CALPOSITION_MAX) {
+			ts->tdata2->nvdata.cal_count = 0;
+			ts->tdata2->nvdata.cal_position = 0;
+			ts->tdata2->nvdata.tune_fix_ver = 0;
+			ts->tdata2->nvdata.cal_pos_hist_cnt = 0;
+			ts->tdata2->nvdata.cal_pos_hist_lastp = 0;
+			input_info(true, &ts->client->dev, "%s: HS cal data is abnormal, set None\n", __func__);
+
+			ts->tdata2->tclm_write(ts->tdata->client, SEC_TCLM_NVM_ALL_DATA);
+		}
+	}
+
 	enable_irq(ts->client->irq);
 #endif
 	ts->nv = get_tsp_nvm_data(ts, SEC_TS_NVM_OFFSET_FAC_RESULT);

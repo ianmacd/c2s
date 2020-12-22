@@ -123,7 +123,16 @@ int __is_mcu_hw_set_init_peri(void __iomem *base)
 	is_hw_set_reg(base, &ois_mcu_peri_regs[R_OIS_PERI_CON_CTRL], recover_val);
 
 	src = is_hw_get_reg(base, &ois_mcu_peri_regs[R_OIS_PUD_CTRL]);
+#ifdef USE_MCU_SPI_PUD_SETTING
+	/***********************
+	  *  MISO : pull-down
+	  *  CLK, CS, MOSI : pull-up
+	  ***********************/
+	recover_val = src & 0x0000FFFF;
+	recover_val = recover_val | 0x31330000;
+#else
 	recover_val = src & 0x0000FF00;
+#endif
 	is_hw_set_reg(base, &ois_mcu_peri_regs[R_OIS_PUD_CTRL], recover_val);
 
 	return ret;
@@ -131,10 +140,25 @@ int __is_mcu_hw_set_init_peri(void __iomem *base)
 
 int __is_mcu_hw_set_clear_peri(void __iomem *base)
 {
-	int ret = 0;	
+	int ret = 0;
 	u32 recover_val = 0;
 	u32 src = 0;
 
+#ifdef USE_MCU_SPI_PUD_SETTING
+	/*****************************
+	  *  MISO : GPIO IN pull-down
+	  *  CLK, CS, MOSI : GPIO OUT pull-up
+	  *****************************/
+	src = is_hw_get_reg(base, &ois_mcu_peri_regs[R_OIS_PERI_CON_CTRL]);
+	recover_val = src & 0x0000FF00;
+	recover_val = recover_val | 0x10110000;
+	is_hw_set_reg(base, &ois_mcu_peri_regs[R_OIS_PERI_CON_CTRL], recover_val);
+
+	src = is_hw_get_reg(base, &ois_mcu_peri_regs[R_OIS_PUD_CTRL]);
+	recover_val = src & 0x0000FF00;
+	recover_val = recover_val | 0x31330000;
+	is_hw_set_reg(base, &ois_mcu_peri_regs[R_OIS_PUD_CTRL], recover_val);
+#else
 #ifdef USE_SHARED_REG_MCU_PERI_CON
 	src = is_hw_get_reg(base, &ois_mcu_peri_regs[R_OIS_PERI_CON_CTRL]);
 	recover_val = src & 0x0000FF00;
@@ -146,6 +170,7 @@ int __is_mcu_hw_set_clear_peri(void __iomem *base)
 	src = is_hw_get_reg(base, &ois_mcu_peri_regs[R_OIS_PUD_CTRL]);
 	recover_val = src & 0x0000FF00;
 	is_hw_set_reg(base, &ois_mcu_peri_regs[R_OIS_PUD_CTRL], recover_val);
+#endif
 
 	return ret;
 }

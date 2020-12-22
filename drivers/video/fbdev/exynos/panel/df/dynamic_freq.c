@@ -105,6 +105,42 @@ exit_changed:
 	return ret;
 }
 
+int set_dynamic_freq_ffc_off(struct panel_device *panel)
+{
+	int ret = 0;
+	struct panel_state *state = &panel->state;
+	struct df_status_info *status = &panel->df_status;
+
+	if (state->connect_panel == PANEL_DISCONNECT) {
+		panel_warn("panel no use\n");
+		return -ENODEV;
+	}
+
+	if (state->cur_state == PANEL_STATE_OFF ||
+		state->cur_state == PANEL_STATE_ON || !IS_PANEL_ACTIVE(panel))
+		return 0;
+
+	if (!check_seqtbl_exist(&panel->panel_data, PANEL_DYNAMIC_FFC_OFF_SEQ)) {
+		panel_dbg("no PANEL_DYNAMIC_FFC_OFF_SEQ\n");
+		return 0;
+	}
+
+	mutex_lock(&panel->op_lock);
+
+	if (status->target_df != status->ffc_df) {
+		status->ffc_df = MAX_DYNAMIC_FREQ; /* off : make abnormal state */
+		ret = panel_do_seqtbl_by_index_nolock(panel, PANEL_DYNAMIC_FFC_OFF_SEQ);
+		if (unlikely(ret < 0)) {
+			panel_err("failed to set PANEL_FFC_OFF_SEQ\n", __func__);
+			goto exit_changed;
+		}
+	}
+
+exit_changed:
+	mutex_unlock(&panel->op_lock);
+	return ret;
+}
+
 int dynamic_freq_update(struct panel_device *panel, int idx)
 {
 	struct df_setting_info *df_setting;
@@ -163,7 +199,7 @@ static int df_notifier(struct notifier_block *self, unsigned long size, void *bu
 		goto exit_notifier;
 	}
 
-	if (msg->dev_id == IPC_SYSTEM_CP_CHANNEL_INFO && 
+	if (msg->dev_id == IPC_SYSTEM_CP_CHANNEL_INFO &&
 		msg->data_len == sizeof(struct ril_noti_info)) {
 		ch_info = (struct ril_noti_info *)msg->data;
 		if (ch_info == NULL) {
@@ -242,7 +278,7 @@ static int parse_dynamic_freq(struct panel_device *panel)
 	struct device_node *node = panel->ddi_node;
 	struct df_dt_info *df;
 	struct exynos_panel_info *lcd_info;
-	
+
 	lcd_info = panel->mipi_drv.get_lcd_info(panel->dsi_id);
 	if (!lcd_info) {
 		panel_err("failed to get lcd_info\n");

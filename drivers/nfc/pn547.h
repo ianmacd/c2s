@@ -120,6 +120,8 @@ enum nfc_err_state {
 /* NFC will call the ioctl to release the dwp on/off protection */
 #define P547_REL_DWPONOFF_WAIT _IOW(PN547_MAGIC, 0x0A, long)
 
+/* NFC HAL can call this ioctl to get the current IRQ state */
+#define PN547_GET_IRQ_STATE    _IOW(PN547_MAGIC, 0x0C, long)
 
 #define NFC_I2C_LDO_ON	1
 #define NFC_I2C_LDO_OFF	0
@@ -243,6 +245,7 @@ struct pn547_dev {
 	struct completion ese_comp;
 	struct completion svdd_sync_comp;
 	struct completion dwp_onoff_comp;
+	struct mutex p61_state_mutex; /* used to make p61_current_state flag secure */
 #endif
 	bool spi_ven_enabled;
 	bool nfc_ven_enabled;

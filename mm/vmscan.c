@@ -2791,6 +2791,65 @@ out:
 	}
 }
 
+#ifdef CONFIG_MEMCG_HEIMDALL
+void forced_shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memcg,
+			      int type, unsigned long nr_requested)
+{
+	struct lruvec *lruvec = mem_cgroup_lruvec(pgdat, memcg);
+	unsigned long nr[NR_LRU_LISTS] = {0,};
+	unsigned long nr_to_scan;
+	enum lru_list lru;
+	unsigned long nr_reclaimed = 0;
+	struct blk_plug plug;
+	unsigned long anon = 0, file = 0;
+	struct scan_control sc = {
+		.nr_to_reclaim = SWAP_CLUSTER_MAX,
+		.gfp_mask = GFP_KERNEL,
+		.reclaim_idx = MAX_NR_ZONES - 1,
+		.target_mem_cgroup = memcg,
+		.priority = DEF_PRIORITY,
+		.may_writepage = !laptop_mode,
+		.may_unmap = 1,
+		.may_swap = 1,
+	};
+
+	if (type == MEMCG_HEIMDALL_SHRINK_ANON) {
+		anon  = lruvec_lru_size(lruvec, LRU_ACTIVE_ANON, MAX_NR_ZONES) +
+			lruvec_lru_size(lruvec, LRU_INACTIVE_ANON, MAX_NR_ZONES);
+		nr[LRU_ACTIVE_ANON] = nr[LRU_INACTIVE_ANON] = anon;
+		nr[LRU_ACTIVE_FILE] = nr[LRU_INACTIVE_FILE] = 0;
+	} else if (type == MEMCG_HEIMDALL_SHRINK_FILE) {
+		file  = lruvec_lru_size(lruvec, LRU_ACTIVE_FILE, MAX_NR_ZONES) +
+			lruvec_lru_size(lruvec, LRU_INACTIVE_FILE, MAX_NR_ZONES);
+		nr[LRU_ACTIVE_ANON] = nr[LRU_INACTIVE_ANON] = 0;
+		nr[LRU_ACTIVE_FILE] = nr[LRU_INACTIVE_FILE] = file;
+	}
+
+	trace_printk("%s heimdall start %d %lu %lu %lu\n", __func__, type, nr_requested, anon, file);
+	blk_start_plug(&plug);
+	while (nr[LRU_INACTIVE_ANON] > 0 || nr[LRU_INACTIVE_FILE] > 0) {
+		for_each_evictable_lru(lru) {
+			if (nr[lru]) {
+				nr_to_scan = min(nr[lru], SWAP_CLUSTER_MAX);
+				nr[lru] -= nr_to_scan;
+
+				nr_reclaimed += shrink_list(lru, nr_to_scan,
+							    lruvec, &sc);
+			}
+		}
+
+		if (nr_reclaimed >= nr_requested)
+			break;
+
+		cond_resched();
+	}
+	blk_finish_plug(&plug);
+	sc.nr_reclaimed += nr_reclaimed;
+	trace_printk("%s end %d %lu %lu %lu\n", __func__, type, nr_reclaimed,
+		nr[LRU_INACTIVE_ANON], nr[LRU_INACTIVE_FILE]);
+}
+#endif
+
 /*
  * This is a basic per-node page freer.  Used by both kswapd and direct reclaim.
  */
@@ -2900,6 +2959,9 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 	}
 	blk_finish_plug(&plug);
 	sc->nr_reclaimed += nr_reclaimed;
+
+	if (need_memory_boosting(NULL))
+		return;
 
 	/*
 	 * Even if we did not try to evict anon pages at all, we want to
@@ -4033,6 +4095,10 @@ static void kswapd_try_to_sleep(pg_data_t *pgdat, int alloc_order, int reclaim_o
 	finish_wait(&pgdat->kswapd_wait, &wait);
 }
 
+#ifdef CONFIG_KSWAPD_PERFTUNE
+static struct cpumask kswapd_cpumask;
+#endif
+
 /*
  * The background pageout daemon, started as a kernel thread
  * from the init process.
@@ -4056,7 +4122,11 @@ static int kswapd(void *p)
 	struct reclaim_state reclaim_state = {
 		.reclaimed_slab = 0,
 	};
+#ifdef CONFIG_KSWAPD_PERFTUNE
+	const struct cpumask *cpumask = &kswapd_cpumask;
+#else
 	const struct cpumask *cpumask = cpumask_of_node(pgdat->node_id);
+#endif
 
 	if (!cpumask_empty(cpumask))
 		set_cpus_allowed_ptr(tsk, cpumask);
@@ -4229,8 +4299,11 @@ static int kswapd_cpu_online(unsigned int cpu)
 		pg_data_t *pgdat = NODE_DATA(nid);
 		const struct cpumask *mask;
 
+#ifdef CONFIG_KSWAPD_PERFTUNE
+		mask = &kswapd_cpumask;
+#else
 		mask = cpumask_of_node(pgdat->node_id);
-
+#endif
 		if (cpumask_any_and(cpu_online_mask, mask) < nr_cpu_ids)
 			/* One of our CPUs online: restore mask */
 			set_cpus_allowed_ptr(pgdat->kswapd, mask);
@@ -4275,10 +4348,57 @@ void kswapd_stop(int nid)
 	}
 }
 
+#ifdef CONFIG_KSWAPD_PERFTUNE
+int kswapd_perftune_cpumask;
+
+static void init_kswapd_cpumask(void)
+{
+	int i, cpumask;
+
+	if (kswapd_perftune_cpumask)
+		cpumask = kswapd_perftune_cpumask;
+	else
+		cpumask = 0xFF;
+
+	cpumask_clear(&kswapd_cpumask);
+	for (i = 0; i < nr_cpu_ids; i++)
+		if (cpumask & (1 << i))
+			cpumask_set_cpu(i, &kswapd_cpumask);
+}
+
+int sysctl_kswapd_perftune_cpumask_handler(struct ctl_table *table, int write,
+			void __user *buffer, size_t *length, loff_t *ppos)
+{
+	char *str;
+	int i, val = 0;
+
+	if (!write)
+		return -EINVAL;
+
+	str = memdup_user_nul(buffer, 4);
+	for (i = 0; i < strlen(str); i++) {
+		if (str[i] >= '0' && str[i] <= '9')
+			val = val * 10 + str[i] - '0';
+		if (val > 255)
+			return -EINVAL;
+	}
+	kswapd_perftune_cpumask = val;
+	kfree(str);
+
+	init_kswapd_cpumask();
+	kswapd_cpu_online(0);
+
+	return 0;
+}
+#endif
+
 static int __init kswapd_init(void)
 {
 	int nid, ret;
 
+#ifdef CONFIG_KSWAPD_PERFTUNE
+	init_kswapd_cpumask();
+#endif
 	swap_setup();
 	for_each_node_state(nid, N_MEMORY)
  		kswapd_run(nid);

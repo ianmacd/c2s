@@ -369,9 +369,7 @@ static irqreturn_t is_isr_pdp_int1(int irq, void *data)
 		is_hardware_sfr_dump(hw_ip->hardware, hw_ip->id, false);
 
 		if (pdp_hw_is_occured(state, PE_PAF_OVERFLOW)) {
-#ifdef CONFIG_EXYNOS_BCM_DBG_AUTO
-			exynos_bcm_dbg_stop(CAMERA_DRIVER);
-#endif
+			exynos_bcm_dbg_stop(PANIC_HANDLE);
 			print_all_hw_frame_count(hw_ip->hardware);
 			is_hardware_sfr_dump(hw_ip->hardware, DEV_HW_END, false);
 #if defined(USE_SKIP_DUMP_LIC_OVERFLOW)

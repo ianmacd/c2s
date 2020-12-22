@@ -42,6 +42,7 @@
 #define MST_CREATE_CMD(x)		(SVC_MST_ID | x)	// Create MST commands
 #define MST_TA				"mst"
 DEFINE_MUTEX(mst_mutex);
+DEFINE_MUTEX(transmit_mutex);
 #endif
 
 #if defined(CONFIG_MST_V2)

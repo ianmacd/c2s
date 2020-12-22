@@ -1438,6 +1438,15 @@ static u8 CANVAS2_A3_S0_GRAYSPOT_OFF_04[] = {
 };
 #endif
 
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+static u8 CANVAS2_A3_S0_BRIGHTDOT_ON_MAX_BRIGHTNESS[] = {
+	0x51, 0x03, 0xFF
+};
+static u8 CANVAS2_A3_S0_BRIGHTDOT_ON_HS_AOR[] = {
+	0xB1, 0x0C, 0x40
+};
+#endif
+
 static DEFINE_STATIC_PACKET(canvas2_a3_s0_level1_key_enable, DSI_PKT_TYPE_WR, CANVAS2_A3_S0_KEY1_ENABLE, 0);
 static DEFINE_STATIC_PACKET(canvas2_a3_s0_level2_key_enable, DSI_PKT_TYPE_WR, CANVAS2_A3_S0_KEY2_ENABLE, 0);
 static DEFINE_STATIC_PACKET(canvas2_a3_s0_level3_key_enable, DSI_PKT_TYPE_WR, CANVAS2_A3_S0_KEY3_ENABLE, 0);
@@ -1791,7 +1800,13 @@ static DEFINE_STATIC_PACKET(canvas2_a3_s0_grayspot_off_01, DSI_PKT_TYPE_WR, CANV
 static DEFINE_STATIC_PACKET(canvas2_a3_s0_grayspot_off_02, DSI_PKT_TYPE_WR, CANVAS2_A3_S0_GRAYSPOT_OFF_02, 0x1C);
 static DEFINE_STATIC_PACKET(canvas2_a3_s0_grayspot_off_03, DSI_PKT_TYPE_WR, CANVAS2_A3_S0_GRAYSPOT_OFF_03, 0x17);
 static DEFINE_STATIC_PACKET(canvas2_a3_s0_grayspot_off_04, DSI_PKT_TYPE_WR, CANVAS2_A3_S0_GRAYSPOT_OFF_04, 0x01);
+#endif
 
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+static DEFINE_STATIC_PACKET(canvas2_a3_s0_brightdot_on_max_brightness, DSI_PKT_TYPE_WR, CANVAS2_A3_S0_BRIGHTDOT_ON_MAX_BRIGHTNESS, 0);
+static DEFINE_STATIC_PACKET(canvas2_a3_s0_brightdot_on_hs_aor, DSI_PKT_TYPE_WR, CANVAS2_A3_S0_BRIGHTDOT_ON_HS_AOR, 0x59);
+static DEFINE_COND(canvas2_a3_s0_cond_is_brightdot_enabled, is_brightdot_enabled);
+static DEFINE_COND(canvas2_a3_s0_cond_is_brightdot_disabled, is_brightdot_disabled);
 #endif
 
 static DEFINE_PANEL_UDELAY(canvas2_a3_s0_wait_1usec, 1);
@@ -2563,6 +2578,19 @@ static void *canvas2_a3_s0_res_init_cmdtbl[] = {
 	&KEYINFO(canvas2_a3_s0_level1_key_disable),
 };
 
+static void *canvas2_a3_s0_wrdisbv_param_cmdtbl[] = {
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+	&CONDINFO_S(canvas2_a3_s0_cond_is_brightdot_enabled),
+	&PKTINFO(canvas2_a3_s0_brightdot_on_max_brightness),
+	&CONDINFO_E(canvas2_a3_s0_cond_is_brightdot_enabled),
+	&CONDINFO_S(canvas2_a3_s0_cond_is_brightdot_disabled),
+	&PKTINFO(canvas2_a3_s0_wrdisbv),
+	&CONDINFO_E(canvas2_a3_s0_cond_is_brightdot_disabled),
+#else
+	&PKTINFO(canvas2_a3_s0_wrdisbv),
+#endif
+};
+static DEFINE_SEQINFO(canvas2_a3_s0_wrdisbv_param_seq, canvas2_a3_s0_wrdisbv_param_cmdtbl);
 
 /* set_bl_param for latest(rev52~)*/
 static void *canvas2_a3_s0_set_bl_param_cmdtbl[] = {
@@ -2571,7 +2599,7 @@ static void *canvas2_a3_s0_set_bl_param_cmdtbl[] = {
 	&PKTINFO(canvas2_a3_s0_tset_elvss),
 	&PKTINFO(canvas2_a3_s0_hbm_setting_rev52),
 	&PKTINFO(canvas2_a3_s0_vbias),
-	&PKTINFO(canvas2_a3_s0_wrdisbv),
+	&SEQINFO(canvas2_a3_s0_wrdisbv_param_seq),
 	&PKTINFO(canvas2_a3_s0_irc_mode),
 	&PKTINFO(canvas2_a3_s0_irc_temporary),
 #ifdef CONFIG_SUPPORT_XTALK_MODE
@@ -2587,7 +2615,7 @@ static void *canvas2_a3_s0_rev40_rev50_set_bl_param_cmdtbl[] = {
 	&PKTINFO(canvas2_a3_s0_acl_control),
 	&PKTINFO(canvas2_a3_s0_tset_elvss),
 	&PKTINFO(canvas2_a3_s0_vbias_rev40_rev50),
-	&PKTINFO(canvas2_a3_s0_wrdisbv),
+	&SEQINFO(canvas2_a3_s0_wrdisbv_param_seq),
 	&PKTINFO(canvas2_a3_s0_irc_mode),
 #ifdef CONFIG_SUPPORT_XTALK_MODE
 	&PKTINFO(canvas2_a3_s0_xtalk_vgh),
@@ -2646,6 +2674,21 @@ static void *canvas2_a3_s0_set_gamma_param_cmdtbl[] = {
 static DEFINE_SEQINFO(canvas2_a3_s0_set_gamma_param_seq,
 		canvas2_a3_s0_set_gamma_param_cmdtbl);
 
+
+static void *canvas2_a3_s0_set_hs_aor_param_cmdtbl[] = {
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+	&CONDINFO_S(canvas2_a3_s0_cond_is_brightdot_enabled),
+	&PKTINFO(canvas2_a3_s0_brightdot_on_hs_aor),
+	&CONDINFO_E(canvas2_a3_s0_cond_is_brightdot_enabled),
+	&CONDINFO_S(canvas2_a3_s0_cond_is_brightdot_disabled),
+	&PKTINFO(canvas2_a3_s0_aor_hs),
+	&CONDINFO_E(canvas2_a3_s0_cond_is_brightdot_disabled),
+#else
+	&PKTINFO(canvas2_a3_s0_aor_hs),
+#endif
+};
+static DEFINE_SEQINFO(canvas2_a3_s0_set_hs_aor_param_seq, canvas2_a3_s0_set_hs_aor_param_cmdtbl);
+
 /* set_fps_param for latest */
 static void *canvas2_a3_s0_set_fps_param_cmdtbl[] = {
 	/* enable h/w te modulation if necessary */
@@ -2668,12 +2711,27 @@ static void *canvas2_a3_s0_set_fps_param_cmdtbl[] = {
 	&PKTINFO(canvas2_a3_s0_vfp_opt_ns),
 	&PKTINFO(canvas2_a3_s0_vfp_opt_hs),
 	&PKTINFO(canvas2_a3_s0_aor_ns),
-	&PKTINFO(canvas2_a3_s0_aor_hs),
+	&SEQINFO(canvas2_a3_s0_set_hs_aor_param_seq),
 	&PKTINFO(canvas2_a3_s0_fps),
 };
 static DEFINE_SEQINFO(canvas2_a3_s0_set_fps_param_seq,
 		canvas2_a3_s0_set_fps_param_cmdtbl);
 /********************************************************************/
+
+
+static void *canvas2_a3_s0_set_hs_aor_param_le_rev51_cmdtbl[] = {
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+	&CONDINFO_S(canvas2_a3_s0_cond_is_brightdot_enabled),
+	&PKTINFO(canvas2_a3_s0_brightdot_on_hs_aor),
+	&CONDINFO_E(canvas2_a3_s0_cond_is_brightdot_enabled),
+	&CONDINFO_S(canvas2_a3_s0_cond_is_brightdot_disabled),
+	&PKTINFO(canvas2_a3_s0_aor_hs_le_rev51),
+	&CONDINFO_E(canvas2_a3_s0_cond_is_brightdot_disabled),
+#else
+	&PKTINFO(canvas2_a3_s0_aor_hs_le_rev51),
+#endif
+};
+static DEFINE_SEQINFO(canvas2_a3_s0_set_hs_aor_param_le_rev51_seq, canvas2_a3_s0_set_hs_aor_param_le_rev51_cmdtbl);
 
 /* set_fps cmd for rev40~rev51 */
 static void *canvas2_a3_s0_rev40_set_fps_param_cmdtbl[] = {
@@ -2697,7 +2755,7 @@ static void *canvas2_a3_s0_rev40_set_fps_param_cmdtbl[] = {
 	&PKTINFO(canvas2_a3_s0_vfp_opt_ns_le_rev51),
 	&PKTINFO(canvas2_a3_s0_vfp_opt_hs_le_rev51),
 	&PKTINFO(canvas2_a3_s0_aor_ns_le_rev51),
-	&PKTINFO(canvas2_a3_s0_aor_hs_le_rev51),
+	&SEQINFO(canvas2_a3_s0_set_hs_aor_param_le_rev51_seq),
 	&PKTINFO(canvas2_a3_s0_fps),
 };
 static DEFINE_SEQINFO(canvas2_a3_s0_rev40_set_fps_param_seq,
@@ -2719,8 +2777,10 @@ static void *canvas2_a3_s0_set_fps_cmdtbl[] = {
 static void *canvas2_a3_s0_display_mode_cmdtbl[] = {
 	&KEYINFO(canvas2_a3_s0_level1_key_enable),
 	&KEYINFO(canvas2_a3_s0_level2_key_enable),
+	&CONDINFO_S(canvas2_a3_s0_cond_is_panel_state_not_lpm),
 	&SEQINFO(canvas2_a3_s0_set_bl_param_seq),
 	&DLYINFO(canvas2_a3_s0_wait_1_vsync),
+	&CONDINFO_E(canvas2_a3_s0_cond_is_panel_state_not_lpm),
 #ifdef CONFIG_SUPPORT_DSU
 	&PKTINFO(canvas2_a3_s0_dsc),
 	&PKTINFO(canvas2_a3_s0_pps),
@@ -2728,8 +2788,10 @@ static void *canvas2_a3_s0_display_mode_cmdtbl[] = {
 	&PKTINFO(canvas2_a3_s0_paset),
 	&PKTINFO(canvas2_a3_s0_scaler),
 #endif
+	&CONDINFO_S(canvas2_a3_s0_cond_is_panel_state_not_lpm),
 	&SEQINFO(canvas2_a3_s0_set_fps_param_seq),
 	&PKTINFO(canvas2_a3_s0_gamma_update_enable),
+	&CONDINFO_E(canvas2_a3_s0_cond_is_panel_state_not_lpm),
 	&KEYINFO(canvas2_a3_s0_level2_key_disable),
 	&KEYINFO(canvas2_a3_s0_level1_key_disable),
 };
@@ -2750,8 +2812,10 @@ static void *canvas2_a3_s0_rev40_set_fps_cmdtbl[] = {
 static void *canvas2_a3_s0_rev40_display_mode_cmdtbl[] = {
 	&KEYINFO(canvas2_a3_s0_level1_key_enable),
 	&KEYINFO(canvas2_a3_s0_level2_key_enable),
+	&CONDINFO_S(canvas2_a3_s0_cond_is_panel_state_not_lpm),
 	&SEQINFO(canvas2_a3_s0_rev40_rev50_set_bl_param_seq),
 	&DLYINFO(canvas2_a3_s0_wait_1_vsync),
+	&CONDINFO_E(canvas2_a3_s0_cond_is_panel_state_not_lpm),
 #ifdef CONFIG_SUPPORT_DSU
 	&PKTINFO(canvas2_a3_s0_dsc),
 	&PKTINFO(canvas2_a3_s0_pps),
@@ -2759,8 +2823,10 @@ static void *canvas2_a3_s0_rev40_display_mode_cmdtbl[] = {
 	&PKTINFO(canvas2_a3_s0_paset),
 	&PKTINFO(canvas2_a3_s0_scaler),
 #endif
+	&CONDINFO_S(canvas2_a3_s0_cond_is_panel_state_not_lpm),
 	&SEQINFO(canvas2_a3_s0_rev40_set_fps_param_seq),
 	&PKTINFO(canvas2_a3_s0_gamma_update_enable),
+	&CONDINFO_E(canvas2_a3_s0_cond_is_panel_state_not_lpm),
 	&KEYINFO(canvas2_a3_s0_level2_key_disable),
 	&KEYINFO(canvas2_a3_s0_level1_key_disable),
 };
@@ -3292,6 +3358,30 @@ static void *canvas2_a3_s0_grayspot_off_cmdtbl[] = {
 };
 #endif
 
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+static void *canvas2_a3_s0_brightdot_cmdtbl[] = {
+	&KEYINFO(canvas2_a3_s0_level1_key_enable),
+	&KEYINFO(canvas2_a3_s0_level2_key_enable),
+	&SEQINFO(canvas2_a3_s0_wrdisbv_param_seq),
+	&DLYINFO(canvas2_a3_s0_wait_1_vsync),
+	&SEQINFO(canvas2_a3_s0_set_hs_aor_param_seq),
+	&PKTINFO(canvas2_a3_s0_gamma_update_enable),
+	&KEYINFO(canvas2_a3_s0_level2_key_disable),
+	&KEYINFO(canvas2_a3_s0_level1_key_disable),
+};
+
+static void *canvas2_a3_s0_brightdot_le_rev51_cmdtbl[] = {
+	&KEYINFO(canvas2_a3_s0_level1_key_enable),
+	&KEYINFO(canvas2_a3_s0_level2_key_enable),
+	&SEQINFO(canvas2_a3_s0_wrdisbv_param_seq),
+	&DLYINFO(canvas2_a3_s0_wait_1_vsync),
+	&SEQINFO(canvas2_a3_s0_set_hs_aor_param_le_rev51_seq),
+	&PKTINFO(canvas2_a3_s0_gamma_update_enable),
+	&KEYINFO(canvas2_a3_s0_level2_key_disable),
+	&KEYINFO(canvas2_a3_s0_level1_key_disable),
+};
+#endif
+
 #ifdef CONFIG_SUPPORT_DDI_CMDLOG
 static void *canvas2_a3_s0_cmdlog_dump_cmdtbl[] = {
 	&KEYINFO(canvas2_a3_s0_level2_key_enable),
@@ -3375,6 +3465,9 @@ static struct seqinfo canvas2_a3_s0_rev40_seqtbl[MAX_PANEL_SEQ] = {
 	[PANEL_GRAYSPOT_ON_SEQ] = SEQINFO_INIT("grayspot-on-seq", canvas2_a3_s0_grayspot_on_cmdtbl),
 	[PANEL_GRAYSPOT_OFF_SEQ] = SEQINFO_INIT("grayspot-off-seq", canvas2_a3_s0_grayspot_off_cmdtbl),
 #endif
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+	[PANEL_BRIGHTDOT_TEST_SEQ] = SEQINFO_INIT("brightdot-seq", canvas2_a3_s0_brightdot_le_rev51_cmdtbl),
+#endif
 #ifdef CONFIG_SUPPORT_DDI_CMDLOG
 	[PANEL_CMDLOG_DUMP_SEQ] = SEQINFO_INIT("cmdlog-dump-seq", canvas2_a3_s0_cmdlog_dump_cmdtbl),
 #endif
@@ -3436,6 +3529,9 @@ static struct seqinfo canvas2_a3_s0_rev50_seqtbl[MAX_PANEL_SEQ] = {
 #ifdef CONFIG_SUPPORT_GRAYSPOT_TEST
 	[PANEL_GRAYSPOT_ON_SEQ] = SEQINFO_INIT("grayspot-on-seq", canvas2_a3_s0_grayspot_on_cmdtbl),
 	[PANEL_GRAYSPOT_OFF_SEQ] = SEQINFO_INIT("grayspot-off-seq", canvas2_a3_s0_grayspot_off_cmdtbl),
+#endif
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+	[PANEL_BRIGHTDOT_TEST_SEQ] = SEQINFO_INIT("brightdot-seq", canvas2_a3_s0_brightdot_le_rev51_cmdtbl),
 #endif
 #ifdef CONFIG_SUPPORT_DDI_CMDLOG
 	[PANEL_CMDLOG_DUMP_SEQ] = SEQINFO_INIT("cmdlog-dump-seq", canvas2_a3_s0_cmdlog_dump_cmdtbl),
@@ -3499,6 +3595,9 @@ static struct seqinfo canvas2_a3_s0_rev52_seqtbl[MAX_PANEL_SEQ] = {
 	[PANEL_GRAYSPOT_ON_SEQ] = SEQINFO_INIT("grayspot-on-seq", canvas2_a3_s0_grayspot_on_cmdtbl),
 	[PANEL_GRAYSPOT_OFF_SEQ] = SEQINFO_INIT("grayspot-off-seq", canvas2_a3_s0_grayspot_off_cmdtbl),
 #endif
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+	[PANEL_BRIGHTDOT_TEST_SEQ] = SEQINFO_INIT("brightdot-seq", canvas2_a3_s0_brightdot_cmdtbl),
+#endif
 #ifdef CONFIG_SUPPORT_DDI_CMDLOG
 	[PANEL_CMDLOG_DUMP_SEQ] = SEQINFO_INIT("cmdlog-dump-seq", canvas2_a3_s0_cmdlog_dump_cmdtbl),
 #endif
@@ -3560,6 +3659,9 @@ static struct seqinfo canvas2_a3_s0_seqtbl[MAX_PANEL_SEQ] = {
 #ifdef CONFIG_SUPPORT_GRAYSPOT_TEST
 	[PANEL_GRAYSPOT_ON_SEQ] = SEQINFO_INIT("grayspot-on-seq", canvas2_a3_s0_grayspot_on_cmdtbl),
 	[PANEL_GRAYSPOT_OFF_SEQ] = SEQINFO_INIT("grayspot-off-seq", canvas2_a3_s0_grayspot_off_cmdtbl),
+#endif
+#ifdef CONFIG_SUPPORT_BRIGHTDOT_TEST
+	[PANEL_BRIGHTDOT_TEST_SEQ] = SEQINFO_INIT("brightdot-seq", canvas2_a3_s0_brightdot_cmdtbl),
 #endif
 #ifdef CONFIG_SUPPORT_DDI_CMDLOG
 	[PANEL_CMDLOG_DUMP_SEQ] = SEQINFO_INIT("cmdlog-dump-seq", canvas2_a3_s0_cmdlog_dump_cmdtbl),

@@ -275,8 +275,10 @@ static int gpu_dvfs_update_config_data_from_dt(struct kbase_device *kbdev)
 		platform->interactive.highspeed_clock = of_data_int_array[0] == 0 ? 500 : (u32) of_data_int_array[0];
 		platform->interactive.highspeed_load  = of_data_int_array[1] == 0 ? 100 : (u32) of_data_int_array[1];
 		platform->interactive.highspeed_delay = of_data_int_array[2] == 0 ? 0 : (u32) of_data_int_array[2];
+#ifdef CONFIG_MALI_TSG
 	} else if (!strncmp("joint", of_string, strlen("joint"))) {
 		platform->governor_type = G3D_DVFS_GOVERNOR_JOINT;
+#endif
 	} else if (!strncmp("static", of_string, strlen("static"))) {
 		platform->governor_type = G3D_DVFS_GOVERNOR_STATIC;
 	} else if (!strncmp("booster", of_string, strlen("booster"))) {
@@ -286,7 +288,9 @@ static int gpu_dvfs_update_config_data_from_dt(struct kbase_device *kbdev)
 	} else {
 		platform->governor_type = G3D_DVFS_GOVERNOR_DEFAULT;
 	}
+#ifdef CONFIG_MALI_TSG
 	platform->governor_type_init = platform->governor_type;
+#endif
 
 #ifdef CONFIG_CAL_IF
 	platform->gpu_dvfs_start_clock = cal_dfs_get_boot_freq(platform->g3d_cmu_cal_id);

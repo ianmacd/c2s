@@ -30,6 +30,7 @@ static void *s6e3hab_hubble3_aod_self_mask_img_cmdtbl[] = {
 	&PKTINFO(s6e3hab_aod_self_mask_sd_path),
 	&DLYINFO(s6e3hab_aod_self_spsram_sel_delay),
 	&PKTINFO(s6e3hab_hubble3_aod_self_mask_img_pkt),
+	&DLYINFO(s6e3hab_aod_self_spsram_reset_delay),
 	&PKTINFO(s6e3hab_aod_reset_sd_path),
 	&KEYINFO(s6e3hab_aod_l2_key_disable),
 };

@@ -188,11 +188,11 @@ config CP_JUMBO_4K_WA
 	  enable 4K jumbo frames for pktproc
 
 config CP_WRESET_WA
-	bool "CP warm reset WA due to WRSTBI disabled"
-	depends on LINK_DEVICE_PCIE
-	default n
-	---help---
-	  CP warm reset WA
+        bool "CP warm reset WA due to WRSTBI disabled"
+        depends on LINK_DEVICE_PCIE
+        default n
+        ---help---
+          CP warm reset WA
 
 endmenu
 endif

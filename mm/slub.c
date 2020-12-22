@@ -46,13 +46,13 @@
 
 spinlock_t ro_pages_lock = __SPIN_LOCK_UNLOCKED();
 
-#define check_cred_cache(s,r)			\
+#define check_cred_cache(s, r)			        \
 do {							\
-	if ((s->name) && (!strcmp(s->name,CRED_JAR_RO) || !strcmp(s->name,TSEC_JAR) || !strcmp(s->name,VFSMNT_JAR) ))	\
-		return r;		\
+	if (s->cred_type)	                        \
+		return r;		                \
 } while (0)
 #else
-#define check_cred_cache(s,r)   
+#define check_cred_cache(s, r)
 #endif
 
 /*
@@ -311,9 +311,7 @@ static inline void set_freepointer(struct kmem_cache *s, void *object, void *fp)
 #endif
 
 #ifdef CONFIG_KDP_CRED
-	if (rkp_cred_enable && s->name && 
-		(!strcmp(s->name, CRED_JAR_RO)|| !strcmp(s->name, TSEC_JAR) 
-		 || !strcmp(s->name, VFSMNT_JAR))) {
+	if (rkp_cred_enable && s->cred_type) {
 		uh_call(UH_APP_KDP, RKP_KDP_X44, (u64)object, (u64)s->offset, (u64)fp, 0);
 	} else
 #endif
@@ -977,11 +975,10 @@ static int check_slab(struct kmem_cache *s, struct page *page)
 	/*
 	 * Skip this function for now
          */
-	if (s->name && (!strcmp(s->name, CRED_JAR_RO) 
-		|| !strcmp(s->name, TSEC_JAR) 
-		|| !strcmp(s->name, VFSMNT_JAR))) 
+	if (s->cred_type)
 		return 1;
 #endif
+
 	maxobj = order_objects(compound_order(page), s->size);
 	if (page->objects > maxobj) {
 		slab_err(s, page, "objects %u > max %u",
@@ -1409,13 +1406,6 @@ slab_flags_t kmem_cache_flags(unsigned int object_size,
 	slab_flags_t flags, const char *name,
 	void (*ctor)(void *))
 {
-#ifdef CONFIG_KDP_CRED
-	if (name && 
-		(!strcmp(name, CRED_JAR_RO) 
-		|| !strcmp(name, TSEC_JAR) 
-		|| !strcmp(name, VFSMNT_JAR)))
-		return flags;
-#endif
 	/*
 	 * Enable debugging if selected on the kernel commandline.
 	 */
@@ -1702,6 +1692,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	struct kmem_cache_order_objects oo = s->oo;
 #if (defined CONFIG_KDP_CRED && (defined CONFIG_UH_RKP || defined CONFIG_FASTUH_RKP))
 	void *virt_page = NULL;
+	u64 sc, va_page, kdp_cmd = 0;
 #endif
 	gfp_t alloc_gfp;
 	void *start, *p;
@@ -1723,10 +1714,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	if ((alloc_gfp & __GFP_DIRECT_RECLAIM) && oo_order(oo) > oo_order(s->min))
 		alloc_gfp = (alloc_gfp | __GFP_NOMEMALLOC) & ~(__GFP_RECLAIM|__GFP_NOFAIL);
 #if (defined CONFIG_KDP_CRED && (defined CONFIG_UH_RKP || defined CONFIG_FASTUH_RKP))
-	if (s->name && 
-		(!strcmp(s->name, CRED_JAR_RO) ||  
-		!strcmp(s->name, TSEC_JAR)|| 
-		!strcmp(s->name, VFSMNT_JAR))) {
+	if (s->cred_type) {
 		virt_page = rkp_ro_alloc();
 		if(!virt_page)
 			goto def_alloc;
@@ -1774,32 +1762,26 @@ def_alloc:
 	 * We modify the following so that slab alloc for protected data
 	 * types are allocated from our own pool.
 	 */
-	if (s->name) {
-		u64	sc,va_page;
-		va_page = (u64)__va(page_to_phys(page));
+	switch (s->cred_type) {
+		case KDP_CRED_JAR:
+			kdp_cmd = RKP_KDP_X50;
+			break;
+		case KDP_TSEC_JAR:
+			kdp_cmd = RKP_KDP_X4E;
+			break;
+		case KDP_VFSMNT_JAR:
+			kdp_cmd = RKP_KDP_X4F;
+			break;
+		default:
+			kdp_cmd = 0;
+	}
 
-		if(!strcmp(s->name, CRED_JAR_RO)) {
-			for(sc = 0; sc < (1 << oo_order(oo)) ; sc++) {
-				uh_call(UH_APP_KDP, RKP_KDP_X50, va_page, 0, 0, 0);
-				va_page += PAGE_SIZE;
-			}
+	if (kdp_cmd) {
+		va_page = (u64)__va(page_to_phys(page));
+		for(sc = 0; sc < (1 << oo_order(oo)); sc++) {
+			uh_call(UH_APP_KDP, kdp_cmd, va_page, 0, 0, 0);
+			va_page += PAGE_SIZE;
 		}
-#if 1
-		if(!strcmp(s->name, TSEC_JAR)) {
-			for(sc = 0; sc < (1 << oo_order(oo)) ; sc++) {
-				uh_call(UH_APP_KDP, RKP_KDP_X4E, va_page, 0, 0, 0);
-				va_page += PAGE_SIZE;
-			}
-		}
-#endif
-#if 1
-		if(!strcmp(s->name, VFSMNT_JAR)) {
-			for(sc = 0; sc < (1 << oo_order(oo)) ; sc++) {
-				uh_call(UH_APP_KDP, RKP_KDP_X4F, va_page, 0, 0, 0);
-				va_page += PAGE_SIZE;
-			}
-		}
-#endif
 	}
 #endif
 
@@ -1858,7 +1840,7 @@ int rkp_from_vfsmnt_cache(unsigned long addr)
 	static void *objp;
 	static struct kmem_cache *s;
 	static struct page *page;
-	
+
 	objp = (void *)addr;
 
 	if(!objp)
@@ -1866,10 +1848,8 @@ int rkp_from_vfsmnt_cache(unsigned long addr)
 
 	page = virt_to_head_page(objp);
 	s = page->slab_cache;
-	if(s && s->name) {
-		if(!strcmp(s->name,"vfsmnt_cache")) {
-			return 1;
-		}
+	if(s && s->cred_type == KDP_VFSMNT_JAR) {
+		return 1;
 	}
 	return 0;
 }
@@ -1938,9 +1918,7 @@ static void __free_slab(struct kmem_cache *s, struct page *page)
 		current->reclaim_state->reclaimed_slab += pages;
 #ifdef CONFIG_KDP_CRED
 	/* We free the protected pages here. */
-	if (s->name && (!strcmp(s->name, CRED_JAR_RO) 
-		|| !strcmp(s->name, TSEC_JAR) 
-		|| !strcmp(s->name, VFSMNT_JAR))) {
+	if (s->cred_type) {
 		free_ro_pages(s,page, order);
 		return;
 	}

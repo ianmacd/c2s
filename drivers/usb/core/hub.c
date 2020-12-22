@@ -3246,6 +3246,9 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 	int		port1 = udev->portnum;
 	int		status;
 	bool		really_suspend = true;
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
+	int		event;
+#endif
 
 	usb_lock_port(port_dev);
 
@@ -3260,6 +3263,10 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 		if (status) {
 			dev_dbg(&udev->dev, "won't remote wakeup, status %d\n",
 					status);
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
+			event = NOTIFY_EXTRA_PORT_SUSPEND_WAKEUP_FAIL;
+			store_usblog_notify(NOTIFY_EXTRA, (void *)&event, NULL);
+#endif
 			/* bail if autosuspend is requested */
 			if (PMSG_IS_AUTO(msg))
 				goto err_wakeup;
@@ -3272,6 +3279,10 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 	if (usb_disable_ltm(udev)) {
 		dev_err(&udev->dev, "Failed to disable LTM before suspend\n");
 		status = -ENOMEM;
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
+		event = NOTIFY_EXTRA_PORT_SUSPEND_LTM_FAIL;
+		store_usblog_notify(NOTIFY_EXTRA, (void *)&event, NULL);
+#endif
 		if (PMSG_IS_AUTO(msg))
 			goto err_ltm;
 	}
@@ -3300,6 +3311,10 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 	}
 	if (status) {
 		dev_dbg(&port_dev->dev, "can't suspend, status %d\n", status);
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
+		event = NOTIFY_EXTRA_PORT_SUSPEND_FAIL;
+		store_usblog_notify(NOTIFY_EXTRA, (void *)&event, NULL);
+#endif
 
 		/* Try to enable USB3 LTM again */
 		usb_enable_ltm(udev);
@@ -5428,7 +5443,7 @@ static void port_event(struct usb_hub *hub, int port1)
 	if (hub_port_warm_reset_required(hub, port1, portstatus)) {
 		dev_dbg(&port_dev->dev, "do warm reset\n");
 #if defined(CONFIG_USB_HOST_CERTI)
-		send_usb_certi_uevent(USB_CERTI_NO_RESPONSE);
+		send_usb_certi_uevent(USB_CERTI_WARM_RESET);
 #endif
 		if (!udev || !(portstatus & USB_PORT_STAT_CONNECTION)
 				|| udev->state == USB_STATE_NOTATTACHED) {

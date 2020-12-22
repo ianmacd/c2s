@@ -80,3 +80,10 @@ config MCPS_ICGB
     depends on MCPS=y && MCPS_GRO_PER_SESSION=y
     help
         Adjust GRO policy according to the features of the session to optimize the throughput of the session.
+
+config MCPS_KUNIT
+    bool "KUnit test for mcps"
+    depends on KUNIT
+    help
+        TODO: Describe config fully
+        kunit test sets

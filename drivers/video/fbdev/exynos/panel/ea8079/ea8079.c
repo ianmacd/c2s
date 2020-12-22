@@ -136,28 +136,6 @@ static int init_aod_dimming_table(struct maptbl *tbl)
 #endif
 #endif
 
-static void copy_elvss_otp_maptbl(struct maptbl *tbl, u8 *dst)
-{
-	struct panel_device *panel;
-	struct panel_info *panel_data;
-
-	if (!tbl || !dst) {
-		pr_err("%s, invalid parameter (tbl %p, dst %p\n",
-				__func__, tbl, dst);
-		return;
-	}
-
-	panel = (struct panel_device *)tbl->pdata;
-	if (unlikely(!panel)) {
-		pr_err("ERR:%s:panel is null\n", __func__);
-		return;
-	}
-
-	panel_data = &panel->panel_data;
-
-	resource_copy_by_name(panel_data, dst, "elvss");
-}
-
 static void copy_tset_maptbl(struct maptbl *tbl, u8 *dst)
 {
 	struct panel_device *panel;
@@ -265,6 +243,54 @@ static int getidx_hbm_transition_table(struct maptbl *tbl)
 	row = panel_bl->props.smooth_transition;
 
 	return maptbl_index(tbl, layer, row, 0);
+}
+
+static int getidx_acl_onoff_table(struct maptbl *tbl)
+{
+	struct panel_device *panel = (struct panel_device *)tbl->pdata;
+
+	if (panel == NULL) {
+		panel_err("panel is null\n");
+		return -EINVAL;
+	}
+
+	return maptbl_index(tbl, 0, panel_bl_get_acl_pwrsave(&panel->panel_bl), 0);
+}
+
+static int getidx_hbm_onoff_table(struct maptbl *tbl)
+{
+	struct panel_device *panel = (struct panel_device *)tbl->pdata;
+	struct panel_bl_device *panel_bl;
+
+	if (panel == NULL) {
+		panel_err("panel is null\n");
+		return -EINVAL;
+	}
+
+	panel_bl = &panel->panel_bl;
+
+	return maptbl_index(tbl, 0,
+			is_hbm_brightness(panel_bl, panel_bl->props.brightness), 0);
+}
+
+static int getidx_acl_dim_onoff_table(struct maptbl *tbl)
+{
+	struct panel_device *panel = (struct panel_device *)tbl->pdata;
+	struct panel_bl_device *panel_bl;
+
+	if (panel == NULL) {
+		panel_err("panel is null\n");
+		return -EINVAL;
+	}
+
+	panel_bl = &panel->panel_bl;
+
+#ifdef CONFIG_SUPPORT_MASK_LAYER
+	return maptbl_index(tbl, 0,
+			 panel_bl->props.mask_layer_br_hook == MASK_LAYER_HOOK_ON ? false : true , 0);
+#else
+	return maptbl_index(tbl, 0, true : 0 , 0);
+#endif
 }
 
 static int getidx_acl_opr_table(struct maptbl *tbl)
@@ -385,9 +411,26 @@ static int getidx_lpm_on_table(struct maptbl *tbl)
 }
 #endif
 
-static int getidx_ea8079_vrr_fps(int fps)
+static int getidx_ea8079_vrr_fps(int vrr_fps)
 {
-	return fps > 60 ? EA8079_VRR_FPS_120 : EA8079_VRR_FPS_60;
+	int fps_index = EA8079_VRR_FPS_60;
+
+	switch (vrr_fps) {
+	case 120:
+		fps_index = EA8079_VRR_FPS_120;
+		break;
+	case 96:
+		fps_index = EA8079_VRR_FPS_96;
+		break;
+	case 60:
+		fps_index = EA8079_VRR_FPS_60;
+		break;
+	default:
+		fps_index = EA8079_VRR_FPS_60;
+		panel_err("undefined FPS:%d\n", vrr_fps);
+	}
+
+	return fps_index;
 }
 
 static int getidx_ea8079_current_vrr_fps(struct panel_device *panel)
@@ -413,6 +456,72 @@ static int getidx_vrr_fps_table(struct maptbl *tbl)
 		row = index;
 
 	return maptbl_index(tbl, layer, row, 0);
+}
+
+#if defined(__PANEL_NOT_USED_VARIABLE__)
+static int getidx_vrr_gamma_table(struct maptbl *tbl)
+{
+	struct panel_device *panel = (struct panel_device *)tbl->pdata;
+	int row = 0, layer = 0, index;
+	struct panel_bl_device *panel_bl;
+
+	panel_bl = &panel->panel_bl;
+
+	index = getidx_ea8079_current_vrr_fps(panel);
+	if (index < 0)
+		layer = 0;
+	else
+		layer = index;
+
+	switch (panel_bl->bd->props.brightness) {
+	case EA8079_R8S_VRR_GAMMA_INDEX_0_BR ... EA8079_R8S_VRR_GAMMA_INDEX_1_BR - 1:
+		row = EA8079_GAMMA_BR_INDEX_0;
+		break;
+	case EA8079_R8S_VRR_GAMMA_INDEX_1_BR ... EA8079_R8S_VRR_GAMMA_INDEX_2_BR - 1:
+		row = EA8079_GAMMA_BR_INDEX_1;
+		break;
+	case EA8079_R8S_VRR_GAMMA_INDEX_2_BR ... EA8079_R8S_VRR_GAMMA_INDEX_3_BR - 1:
+		row = EA8079_GAMMA_BR_INDEX_2;
+		break;
+	case EA8079_R8S_VRR_GAMMA_INDEX_3_BR ... EA8079_R8S_VRR_GAMMA_INDEX_MAX_BR:
+		row = EA8079_GAMMA_BR_INDEX_3;
+		break;
+	}
+
+	return maptbl_index(tbl, layer, row, 0);
+}
+#endif
+
+static int getidx_lpm_mode_table(struct maptbl *tbl)
+{
+	int row = 0;
+	struct panel_device *panel;
+	struct panel_bl_device *panel_bl;
+	struct panel_properties *props;
+
+	panel = (struct panel_device *)tbl->pdata;
+	panel_bl = &panel->panel_bl;
+	props = &panel->panel_data.props;
+
+#ifdef CONFIG_SUPPORT_DOZE
+	switch (props->alpm_mode) {
+	case ALPM_LOW_BR:
+	case ALPM_HIGH_BR:
+		row = ALPM_MODE;
+		break;
+	case HLPM_LOW_BR:
+	case HLPM_HIGH_BR:
+		row = HLPM_MODE;
+		break;
+	default:
+		panel_err("Invalid alpm mode : %d\n", props->alpm_mode);
+		break;
+	}
+	panel_info("alpm_mode %d -> %d\n", props->cur_alpm_mode, props->alpm_mode);
+	props->cur_alpm_mode = props->alpm_mode;
+#endif
+
+	return maptbl_index(tbl, 0, row, 0);
 }
 
 #ifdef CONFIG_EXYNOS_DECON_MDNIE_LITE
@@ -501,15 +610,6 @@ static int getidx_mdnie_scenario_maptbl(struct maptbl *tbl)
 
 	return tbl->ncol * (mdnie->props.mode);
 }
-
-#ifdef CONFIG_SUPPORT_HMD
-static int getidx_mdnie_hmd_maptbl(struct maptbl *tbl)
-{
-	struct mdnie_info *mdnie = (struct mdnie_info *)tbl->pdata;
-
-	return tbl->ncol * (mdnie->props.hmd);
-}
-#endif
 
 static int getidx_mdnie_hdr_maptbl(struct maptbl *tbl)
 {
@@ -610,8 +710,8 @@ static void update_current_scr_white(struct maptbl *tbl, u8 *dst)
 
 	mdnie = (struct mdnie_info *)tbl->pdata;
 	mdnie->props.cur_wrgb[0] = *dst;
-	mdnie->props.cur_wrgb[1] = *(dst + 2);
-	mdnie->props.cur_wrgb[2] = *(dst + 4);
+	mdnie->props.cur_wrgb[1] = *(dst + 1);
+	mdnie->props.cur_wrgb[2] = *(dst + 2);
 }
 
 static int init_color_coordinate_table(struct maptbl *tbl)
@@ -755,7 +855,7 @@ static void copy_color_coordinate_maptbl(struct maptbl *tbl, u8 *dst)
 			(char)((mdnie->props.mode == AUTO) ?
 				mdnie->props.def_wrgb_ofs[i] : 0);
 		mdnie->props.cur_wrgb[i] = value;
-		dst[i * 2] = value;
+		dst[i] = value;
 		if (mdnie->props.mode == AUTO)
 			panel_dbg("cur_wrgb[%d] %d(%02X) def_wrgb[%d] %d(%02X), def_wrgb_ofs[%d] %d\n",
 					i, mdnie->props.cur_wrgb[i], mdnie->props.cur_wrgb[i],
@@ -790,7 +890,7 @@ static void copy_scr_white_maptbl(struct maptbl *tbl, u8 *dst)
 
 	for (i = 0; i < tbl->ncol; i++) {
 		mdnie->props.cur_wrgb[i] = tbl->arr[idx + i];
-		dst[i * 2] = tbl->arr[idx + i];
+		dst[i] = tbl->arr[idx + i];
 		panel_dbg("cur_wrgb[%d] %d(%02X)\n",
 				i, mdnie->props.cur_wrgb[i], mdnie->props.cur_wrgb[i]);
 	}
@@ -822,7 +922,7 @@ static void copy_adjust_ldu_maptbl(struct maptbl *tbl, u8 *dst)
 			(((mdnie->props.mode == AUTO) && (mdnie->props.scenario != EBOOK_MODE)) ?
 				mdnie->props.def_wrgb_ofs[i] : 0);
 		mdnie->props.cur_wrgb[i] = value;
-		dst[i * 2] = value;
+		dst[i] = value;
 		panel_dbg("cur_wrgb[%d] %d(%02X) (orig:0x%02X offset:%d)\n",
 				i, mdnie->props.cur_wrgb[i], mdnie->props.cur_wrgb[i],
 				tbl->arr[idx + i], mdnie->props.def_wrgb_ofs[i]);
@@ -1252,7 +1352,7 @@ static int getidx_gamma_mode2_brt_table(struct maptbl *tbl)
 
 static int getidx_dyn_ffc_table(struct maptbl *tbl)
 {
-	int row = 0, layer = 0;
+	int row = 0;
 	struct df_status_info *status;
 	struct panel_device *panel = (struct panel_device *)tbl->pdata;
 
@@ -1261,13 +1361,6 @@ static int getidx_dyn_ffc_table(struct maptbl *tbl)
 		return -EINVAL;
 	}
 	status = &panel->df_status;
-
-	layer = status->current_ddi_osc;
-	if (layer >= MAX_EA8079_OSC) {
-		panel_warn("osc out of range %d %d, set to %d\n", layer, MAX_EA8079_OSC, EA8079_OSC_DEFAULT);
-		layer = status->current_ddi_osc = EA8079_OSC_DEFAULT;
-		status->request_ddi_osc = EA8079_OSC_DEFAULT;
-	}
 
 	row = status->ffc_df;
 	if (row >= EA8079_MAX_MIPI_FREQ) {
@@ -1279,7 +1372,253 @@ static int getidx_dyn_ffc_table(struct maptbl *tbl)
 	panel_info("ffc idx: %d, ddi_osc: %d, row: %d\n",
 			status->ffc_df, status->current_ddi_osc, row);
 
-	return maptbl_index(tbl, layer, row, 0);
+	return maptbl_index(tbl, 0, row, 0);
 }
 
 #endif
+
+static bool ea8079_is_120hz(struct panel_device *panel)
+{
+	return (getidx_ea8079_current_vrr_fps(panel) == EA8079_VRR_FPS_120);
+}
+/*
+ * all_gamma_to_each_addr_table
+ *
+ * EA8079 gamma mtp register map is mess up.
+ * Frist, read all register values, Make and sort to one big gamma table.
+ * Do Gamma offset cal operation as one ALL big gamma table.
+ * And then Split the table into mess up register map again.
+ */
+
+#if defined(__PANEL_NOT_USED_VARIABLE__)
+static void gamma_to_reg_map_table(struct panel_device *panel,
+			u8 *new_gamma, int fps_index, int br_index)
+{
+
+	int pos = 0;
+	struct maptbl *target_maptbl = NULL;
+	struct maptbl_pos target_pos = {0, };
+	u8 *gamma_table_temp = NULL;
+	struct panel_info *panel_data = NULL;
+
+	panel_data = &panel->panel_data;
+	gamma_table_temp = kzalloc(EA8079_GAMMA_MTP_ALL_LEN * 2, GFP_KERNEL);
+
+
+	if (fps_index == EA8079_VRR_FPS_120) {
+		/* 1. copy 120offset cal gamma */
+		memcpy(gamma_table_temp + EA8079_GAMMA_MTP_ALL_LEN, new_gamma, EA8079_GAMMA_MTP_ALL_LEN);
+		/* 2. copy orig 60 gamma */
+		resource_copy_by_name(panel_data, gamma_table_temp, "gamma_mtp_60");
+	} else {
+		/* 1. copy orig 120 gamma */
+		resource_copy_by_name(panel_data,
+				gamma_table_temp + EA8079_GAMMA_MTP_ALL_LEN, "gamma_mtp_120");
+		/* 2. copy 96/60/48 offset cal gamma */
+		memcpy(gamma_table_temp, new_gamma, EA8079_GAMMA_MTP_ALL_LEN);
+	}
+
+
+	target_pos.index[NDARR_3D] = fps_index;
+	target_pos.index[NDARR_2D] = br_index;
+	pos = 0;
+
+	target_maptbl = find_panel_maptbl_by_index(panel_data, GAMMA_MTP_0_HS_MAPTBL);
+	maptbl_fill(target_maptbl, &target_pos, gamma_table_temp + pos, EA8079_GAMMA_MTP_0_LEN);
+	pos += EA8079_GAMMA_MTP_0_LEN;
+	target_maptbl = find_panel_maptbl_by_index(panel_data, GAMMA_MTP_1_HS_MAPTBL);
+	maptbl_fill(target_maptbl, &target_pos, gamma_table_temp + pos, EA8079_GAMMA_MTP_1_LEN);
+	pos += EA8079_GAMMA_MTP_1_LEN;
+	target_maptbl = find_panel_maptbl_by_index(panel_data, GAMMA_MTP_2_HS_MAPTBL);
+	maptbl_fill(target_maptbl, &target_pos, gamma_table_temp + pos, EA8079_GAMMA_MTP_2_LEN);
+	pos += EA8079_GAMMA_MTP_2_LEN;
+	target_maptbl = find_panel_maptbl_by_index(panel_data, GAMMA_MTP_3_HS_MAPTBL);
+	maptbl_fill(target_maptbl, &target_pos, gamma_table_temp + pos, EA8079_GAMMA_MTP_3_LEN);
+	pos += EA8079_GAMMA_MTP_3_LEN;
+
+
+	kfree(gamma_table_temp);
+}
+
+static void gamma_itoc(u8 *dst, s32(*src)[MAX_COLOR], int nr_tp)
+{
+	unsigned int i, dst_pos = 0;
+
+	if (nr_tp != EA8079_NR_TP) {
+		panel_err("invalid nr_tp(%d)\n", nr_tp);
+		return;
+	}
+
+	//11th
+	dst[0] = src[0][RED] & 0xFF;
+	dst[1] = src[0][GREEN] & 0xFF;
+	dst[2] = src[0][BLUE] & 0xFF;
+
+	dst_pos = 3;
+
+	//10th ~ 1st
+	for (i = 1; i < nr_tp; i++) {
+		dst_pos = (i - 1) * 4 + 3;
+		dst[dst_pos] = (src[i][RED]>>4 & 0x3F);
+		dst[dst_pos + 1] = (src[i][RED]<<4 & 0xF0) | (src[i][GREEN]>>6  & 0x0F);
+		dst[dst_pos + 2] = (src[i][GREEN]<<2 & 0xFC) | (src[i][BLUE]>>8  & 0x03);
+		dst[dst_pos + 3] = (src[i][BLUE]<<0 & 0xFF);
+	}
+}
+
+
+static int gamma_ctoi(s32 (*dst)[MAX_COLOR], u8 *src, int nr_tp)
+{
+	unsigned int i, pos = 0;
+
+	//11th
+	dst[0][RED] = src[pos];
+	dst[0][GREEN] = src[pos + 1];
+	dst[0][BLUE] = src[pos + 2];
+
+	//10th ~ 1st
+	for (i = 1 ; i < nr_tp ; i++) {
+		pos = (i - 1) * 4 + 3;
+		dst[i][RED] = (src[pos] & 0x3F)<<4 | (src[pos+1] & 0xF0)>>4;
+		dst[i][GREEN] = (src[pos+1] & 0x0F)<<6 | (src[pos+2] & 0xFC)>>2;
+		dst[i][BLUE] = (src[pos+2] & 0x03)<<8 | (src[pos+3] & 0xFF)>>0;
+	}
+
+	return 0;
+}
+
+static int gamma_sum(s32 (*dst)[MAX_COLOR], s32 (*src)[MAX_COLOR],
+		s32 (*offset)[MAX_COLOR], int nr_tp)
+{
+	unsigned int i, c;
+	int upper_limit[EA8079_NR_TP] = {
+		0xFF, 0x3FF, 0x3FF, 0x3FF, 0x3FF, 0x3FF, 0x3FF, 0x3FF, 0x3FF, 0x3FF, 0x3FF
+	};
+
+	if (nr_tp != EA8079_NR_TP) {
+		panel_err("invalid nr_tp(%d)\n", nr_tp);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < nr_tp; i++) {
+		for_each_color(c)
+			dst[i][c] =
+			min(max(src[i][c] + offset[i][c], 0), upper_limit[i]);
+	}
+
+	return 0;
+}
+
+static int  do_gamma_update(struct panel_device *panel, int fps_index, int br_index)
+{
+	int src_gamma = 0;
+	int ret;
+	struct panel_info *panel_data;
+	struct gm2_dimming_lut *dim_lut;
+	struct panel_dimming_info *panel_dim_info;
+	u8 gamma_8_org[EA8079_GAMMA_MTP_1SET_LEN];
+	u8 gamma_8_new[EA8079_GAMMA_MTP_1SET_LEN];
+	s32 gamma_32_org[EA8079_NR_TP][MAX_COLOR];
+	s32 gamma_32_new[EA8079_NR_TP][MAX_COLOR];
+	u8 gamma_all_org[EA8079_GAMMA_MTP_ALL_LEN];
+	s32(*rgb_color_offset)[MAX_COLOR];
+	int gamma_index = 0;
+	u8 gamma_8_new_set[EA8079_GAMMA_MTP_1SET_LEN * EA8079_GAMMA_MTP_SET_NUM];
+
+	panel_data = &panel->panel_data;
+	panel_dim_info = panel_data->panel_dim_info[PANEL_BL_SUBDEV_TYPE_DISP];
+
+	if (unlikely(!panel_dim_info)) {
+		panel_err("panel_bl-%d panel_dim_info is null\n",
+				PANEL_BL_SUBDEV_TYPE_DISP);
+		return -EINVAL;
+	}
+
+	if (panel_dim_info->nr_gm2_dim_init_info == 0) {
+		panel_err("panel_bl-%d gammd mode 2 init info is null\n",
+				PANEL_BL_SUBDEV_TYPE_DISP);
+		return -EINVAL;
+	}
+
+	dim_lut = panel_dim_info->gm2_dim_init_info[0].dim_lut;
+
+	for (gamma_index = 0 ; gamma_index < EA8079_GAMMA_MTP_SET_NUM; gamma_index++) {
+		/* select source */
+		src_gamma =
+			dim_lut[MAX_EA8079_GAMMA_MTP * MAX_EA8079_GAMMA_BR_INDEX * fps_index
+				+ MAX_EA8079_GAMMA_MTP * br_index
+				+ (EA8079_GAMMA_MTP_SET_NUM - gamma_index - 1)].source_gamma;
+
+		if (!dim_lut)
+			panel_err("no dim_lut\n");
+
+		ret = resource_copy_by_name(panel_data,
+				gamma_all_org, src_gamma == EA8079_VRR_FPS_120 ? "gamma_mtp_120" : "gamma_mtp_60");
+
+
+		/* copy 1 row gamma from all gamma table */
+		memcpy(gamma_8_org, gamma_all_org + EA8079_GAMMA_MTP_1SET_LEN * gamma_index,
+				EA8079_GAMMA_MTP_1SET_LEN);
+
+		/* byte to int */
+		gamma_ctoi(gamma_32_org, gamma_8_org, EA8079_NR_TP);
+
+		/* add offset */
+		rgb_color_offset =
+			dim_lut[MAX_EA8079_GAMMA_MTP * MAX_EA8079_GAMMA_BR_INDEX * fps_index
+				+ MAX_EA8079_GAMMA_MTP * br_index
+				+ (EA8079_GAMMA_MTP_SET_NUM - gamma_index - 1)].rgb_color_offset;
+		gamma_sum(gamma_32_new, gamma_32_org,
+				rgb_color_offset, EA8079_NR_TP);
+		/* int to byte */
+		gamma_itoc(gamma_8_new, gamma_32_new, EA8079_NR_TP);
+
+		memcpy(gamma_8_new_set + EA8079_GAMMA_MTP_1SET_LEN * gamma_index, gamma_8_new,
+					EA8079_GAMMA_MTP_1SET_LEN);
+	}
+
+	gamma_to_reg_map_table(panel, gamma_8_new_set, fps_index, br_index);
+
+	return ret;
+}
+
+static int init_gamma_mtp_table(struct maptbl *tbl)
+{
+	struct panel_device *panel;
+	int ret = 0;
+	int br_index = 0;
+	int vrr_fps_index = 0;
+
+	if (unlikely(!tbl || !tbl->pdata)) {
+		panel_err("panel_bl-%d invalid param (tbl %p, pdata %p)\n",
+				PANEL_BL_SUBDEV_TYPE_DISP, tbl, tbl ? tbl->pdata : NULL);
+		return -EINVAL;
+	}
+
+	panel = tbl->pdata;
+
+	for (vrr_fps_index = 0 ; vrr_fps_index < MAX_EA8079_VRR_FPS; vrr_fps_index++) {
+		for (br_index = 0 ; br_index < MAX_EA8079_GAMMA_BR_INDEX; br_index++) {
+				do_gamma_update(panel, vrr_fps_index, br_index);
+		}
+	}
+
+	panel_dbg("%s initialize\n", tbl->name);
+
+	return ret;
+}
+
+
+static int init_gamma_mtp_all_table(struct maptbl *tbl)
+{
+	return init_gamma_mtp_table(tbl);
+}
+#endif
+
+static bool is_panel_state_not_lpm(struct panel_device *panel)
+{
+	if (panel->state.cur_state != PANEL_STATE_ALPM)
+		return true;
+
+	return false;
+}

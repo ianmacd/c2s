@@ -15,6 +15,7 @@
 #define TOKEN_END	(-255)
 #define TOKEN_LIST_NUM	(64)
 #define TOKEN_MAX	(64)
+#define KERNEL_CNT_MAX	(256)
 
 struct dsp_string_tree_node *xml_str;
 struct dsp_xml_lib_table *xml_libs;
@@ -233,11 +234,18 @@ static int __create_kernel_table(struct dsp_xml_lib *lib, char *buf,
 			DL_ERROR("token end before create xml structure\n");
 			return -1;
 		} else if (ret == KERNEL && type == SXML_ENDTAG) {
-			if (idx == 0xFFFFFFFF) {
-				DL_ERROR("no kernel idx\n");
+			if (!lib->kernels) {
+				DL_ERROR("no memory for kernel tables\n");
 				return -1;
 			}
 
+			if (idx == 0xFFFFFFFF) {
+				DL_ERROR("no kernel idx\n");
+				return -1;
+			} else if (idx >= lib->kernel_cnt) {
+				DL_ERROR("invalid kernel idx\n");
+				return -1;
+			}
 			lib->kernels[idx] = kernel_table;
 			return 0;
 		} else if (ret == ID && type == SXML_CDATA) {
@@ -328,7 +336,8 @@ static int __create_lib(char *buf, unsigned int buf_len)
 			dsp_dl_free(lib);
 			DL_ERROR("token end before create xml structure\n");
 			return -1;
-		} else if (ret == LIB && type == SXML_ENDTAG) {
+		} else if (ret == LIB && type == SXML_ENDTAG
+				&& lib->name != NULL) {
 			dsp_hash_push(&xml_libs->lib_hash, lib->name, lib);
 			return 0;
 		} else if (ret == NAME && type == SXML_CDATA) {
@@ -377,11 +386,24 @@ static int __create_lib(char *buf, unsigned int buf_len)
 				DL_DEBUG("lib kernel cnt : %u\n",
 					lib->kernel_cnt);
 
+				if (lib->kernel_cnt > KERNEL_CNT_MAX) {
+					DL_ERROR("kernel_cnt(%u) is over(%d)\n",
+							lib->kernel_cnt,
+							KERNEL_CNT_MAX);
+					dsp_dl_free(lib);
+					return -1;
+				}
+
 				lib->kernels = (struct dsp_xml_kernel_table *)
 					dsp_dl_malloc(
 						sizeof(*lib->kernels) *
 						lib->kernel_cnt,
 						"XML kernel table");
+				if (!lib->kernels) {
+					DL_ERROR("Failed to alloc XML kt\n");
+					dsp_dl_free(lib);
+					return -1;
+				}
 			} else {
 				if (lib->kernels)
 					dsp_dl_free(lib->kernels);

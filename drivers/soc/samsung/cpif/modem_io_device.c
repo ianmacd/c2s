@@ -390,6 +390,44 @@ static int check_gro_support(struct sk_buff *skb)
 }
 #endif
 
+#ifdef CONFIG_USB_CONFIGFS_F_MBIM
+static bool check_pcket_filter(struct sk_buff *skb)
+{
+	struct link_device *ld = skbpriv(skb)->ld;
+	u8 ch = skbpriv(skb)->sipc_ch;
+	u8 rmnet_type = ld->get_rmnet_type(ch);
+	int i, j;
+	u32 filters_count = 0;
+	u32 filter_size = 0;
+	u8 filter = 0;
+	u8 mask = 0;
+
+	filters_count = ld->packet_filter_table.rmnet[rmnet_type].filters_count;
+
+	if (filters_count == 0)
+		return false;
+
+	for (i = 0; i < filters_count; i++) {
+		filter_size = ld->packet_filter_table.rmnet[rmnet_type].single_filter[i].filter_size;
+		if (skb->data_len != filter_size)
+			continue;
+
+		for (j = 0; j < filter_size; j++) {
+			filter = ld->packet_filter_table.rmnet[rmnet_type].single_filter[i].filter[j];
+			mask = ld->packet_filter_table.rmnet[rmnet_type].single_filter[i].mask[j];
+
+			if (filter != (skb->data[j] & mask)) {
+				mif_info("The packet is not in this filter. (session_id %d, filters_count %d)\n", rmnet_type, i);
+				break;
+			}
+		}
+		if (j == filter_size)
+			return true;
+	}
+	return false;
+}
+#endif
+
 static int rx_multi_pdp(struct sk_buff *skb)
 {
 	struct link_device *ld = skbpriv(skb)->ld;
@@ -450,6 +488,11 @@ static int rx_multi_pdp(struct sk_buff *skb)
 #ifdef CONFIG_USB_CONFIGFS_F_MBIM
 	/* packet capture for MBIM device */
 	mif_queue_skb(skb, RX);
+
+	if (ld->is_modern_standby) {
+		if (!check_pcket_filter(skb))
+			return -ENODEV;
+	}
 
 	if (ld->pdn_table.pdn[rmnet_type].dl_dst == PC) {
 		ret = mbim_queue_head(skb);

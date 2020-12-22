@@ -152,7 +152,6 @@ struct vs4l_container_list {
 	struct timeval		timestamp[6];
 	__u32			count;
 	struct vs4l_container	*containers;
-	struct vs4l_profiler	*profiler;
 };
 
 /*
@@ -190,5 +189,7 @@ struct vs4l_container_list {
 #define VS4L_VERTEXIOC_PREPARE			_IOW('V', 8, struct vs4l_container_list)
 #define VS4L_VERTEXIOC_UNPREPARE		_IOW('V', 9, struct vs4l_container_list)
 #define VS4L_VERTEXIOC_SCHED_PARAM		_IOW('V', 10, struct vs4l_sched_param)
+#define VS4L_VERTEXIOC_PROFILE_ON 		_IOW('V', 11, struct vs4l_profiler)
+#define VS4L_VERTEXIOC_PROFILE_OFF		_IOW('V', 12, struct vs4l_profiler)
 
 #endif

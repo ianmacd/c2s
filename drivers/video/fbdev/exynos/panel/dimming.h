@@ -299,6 +299,12 @@ for ((i) = (r).from;		\
 	.rgb_color_offset = (s32 (*)[MAX_COLOR])(ctbl),	\
 }
 
+#define GM2_LUT_V0_INIT_SRC(ctbl, gamma_index)		\
+{													\
+	.rgb_color_offset = (s32 (*)[MAX_COLOR])(ctbl),	\
+	.source_gamma = gamma_index, \
+}
+
 struct dimming_lut_info {
 	int nrow;
 	int ncol;
@@ -394,6 +400,7 @@ struct dimming_init_info {
 /* gamma mode 2 */
 struct gm2_dimming_lut {
 	s32(*rgb_color_offset)[MAX_COLOR];
+	int source_gamma;
 };
 
 struct gm2_dimming_init_info {

@@ -1263,7 +1263,10 @@ static int set_debug_reset_rwc_proc_show(struct seq_file *m, void *v)
 	char *rstcnt;
 
 	rstcnt = get_bk_item_val("RSTCNT");
-	seq_printf(m, "%s", rstcnt);
+	if (!rstcnt)
+		seq_printf(m, "%d", secdbg_rere_get_rstcnt_from_cmdline());
+	else
+		seq_printf(m, "%s", rstcnt);
 
 	return 0;
 }

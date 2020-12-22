@@ -1210,6 +1210,14 @@ static void itmon_report_traceinfo(struct itmon_dev *itmon,
 			(BIT_AXPROT(tracedata->ext_info_2) & 0x2) ? "Non-secure access" : "Secure access",
 			itmon_pathtype[traceinfo->path_type == -1 ? group->bus_type : traceinfo->path_type]);
 	}
+
+	/* Summary */
+	pr_err("\nITMON: %s %s / %s / 0x%lx / %s / %s\n",
+		traceinfo->port, traceinfo->master ? traceinfo->master : "",
+		traceinfo->dest ? traceinfo->dest : NOT_AVAILABLE_STR,
+		traceinfo->target_addr,
+		trans_type == TRANS_TYPE_READ ? "R" : "W",
+		itmon_errcode[traceinfo->errcode]);
 }
 
 static void itmon_report_pathinfo(struct itmon_dev *itmon,
@@ -1417,6 +1425,16 @@ static void itmon_report_prot_chk_rawdata(struct itmon_dev *itmon,
 		"      > REG(0x100~0x10C)      : 0x%08X, 0x%08X, 0x%08X, 0x%08X\n",
 		node->name, itmon_nodestring[node->type],
 		node->phy_regs,
+		dbg_mo_cnt,
+		prot_chk_ctl,
+		prot_chk_info,
+		prot_chk_int_id);
+
+	/* Summary */
+	pr_err("\nITMON: Protocol Error / %s / 0x%08X / %s / 0x%08X / 0x%08X / 0x%08X / 0x%08X\n",
+		node->name,
+		node->phy_regs,
+		itmon_nodestring[node->type],
 		dbg_mo_cnt,
 		prot_chk_ctl,
 		prot_chk_info,

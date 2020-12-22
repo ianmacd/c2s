@@ -24,9 +24,10 @@
 #include "is-device-sensor-peri.h"
 #include "is-core.h"
 
-#if defined(CONFIG_LEDS_RT8547)
 #include <linux/leds-rt8547.h>
 extern int rt8547_led_mode_ctrl(int state);
+#if defined(CONFIG_FLASH_CURRENT_CHANGE_SUPPORT)
+extern int rt8547_set_flash_current(int intensity);
 #endif
 
 static int flash_rt8547_init(struct v4l2_subdev *subdev, u32 val)
@@ -55,6 +56,7 @@ static int flash_rt8547_init(struct v4l2_subdev *subdev, u32 val)
 static int sensor_rt8547_flash_control(struct v4l2_subdev *subdev, enum flash_mode mode, u32 intensity)
 {
 	int ret = 0;
+	int flash_en = 0;
 	struct is_flash *flash = NULL;
 
 	BUG_ON(!subdev);
@@ -62,30 +64,33 @@ static int sensor_rt8547_flash_control(struct v4l2_subdev *subdev, enum flash_mo
 	flash = (struct is_flash *)v4l2_get_subdevdata(subdev);
 	BUG_ON(!flash);
 
+	flash_en = flash->flash_gpio;
+	if (flash_en < 0) {
+		ret = -EINVAL;
+		goto p_err;
+	}
+
 	dbg_flash("%s : mode = %s, intensity = %d\n", __func__,
 		mode == CAM2_FLASH_MODE_OFF ? "OFF" :
 		mode == CAM2_FLASH_MODE_SINGLE ? "FLASH" : "TORCH",
 		intensity);
 
 	if (mode == CAM2_FLASH_MODE_OFF) {
-#if defined(CONFIG_LEDS_RT8547)
 		ret = rt8547_led_mode_ctrl(RT8547_DISABLES_MOVIE_FLASH_MODE);
-#endif
-		ret = control_flash_gpio(flash->flash_gpio, 0);
+		ret = control_flash_gpio(flash_en, 0);
 		if (ret)
 			err("capture flash off fail");
 	} else if (mode == CAM2_FLASH_MODE_SINGLE) {
-#if defined(CONFIG_LEDS_RT8547)
 		ret = rt8547_led_mode_ctrl(RT8547_ENABLE_FLASH_MODE);
+#if defined(CONFIG_FLASH_CURRENT_CHANGE_SUPPORT)
+		ret = rt8547_set_flash_current(intensity);
 #endif
-		ret = control_flash_gpio(flash->flash_gpio, 1);
+		ret = control_flash_gpio(flash_en, 1);
 		if (ret)
 			err("capture flash on fail");
 	} else if (mode == CAM2_FLASH_MODE_TORCH) {
-#if defined(CONFIG_LEDS_RT8547)
 		ret = rt8547_led_mode_ctrl(RT8547_ENABLE_PRE_FLASH_MODE);
-#endif
-		ret = control_flash_gpio(flash->torch_gpio, 1);
+		ret = control_flash_gpio(flash_en, 1);
 		if (ret)
 			err("torch flash on fail");
 	} else {

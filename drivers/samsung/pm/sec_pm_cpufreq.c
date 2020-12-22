@@ -25,7 +25,7 @@ static unsigned long throttle_count;
 static int sec_pm_cpufreq_set_max_freq(struct sec_pm_cpufreq_dev *cpufreq_dev,
 				 unsigned int level)
 {
-	unsigned long max_freq;
+	unsigned int max_freq;
 
 	if (WARN_ON(level > cpufreq_dev->max_level))
 		return -EINVAL;
@@ -37,7 +37,7 @@ static int sec_pm_cpufreq_set_max_freq(struct sec_pm_cpufreq_dev *cpufreq_dev,
 	cpufreq_dev->cur_level = level;
 	cpufreq_dev->max_freq = max_freq;
 
-	pr_info("%s: throttle cpu%d : %lu KHz\n", __func__,
+	pr_info("%s: throttle cpu%d : %u KHz\n", __func__,
 			cpufreq_dev->policy->cpu, max_freq);
 
 	cpufreq_update_policy(cpufreq_dev->policy->cpu);

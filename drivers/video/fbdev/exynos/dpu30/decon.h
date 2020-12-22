@@ -516,6 +516,8 @@ struct decon_readback {
 	struct dma_fence *fence;
 	struct work_struct work;
 	struct workqueue_struct *wq;
+	u32 map_cnt;
+	u32 unmap_cnt;
 };
 
 struct vrr_config_data {
@@ -1180,7 +1182,7 @@ struct decon_win_update {
 	u32 verti_cnt;
 	/* previous update region */
 	struct decon_rect prev_up_region;
-	struct decon_rect back_up_region;
+	bool force_full;
 };
 
 struct decon_bts_ops {
@@ -1389,6 +1391,10 @@ struct decon_device {
 	bool mres_enabled;
 	bool low_persistence;
 
+#if IS_ENABLED(CONFIG_EXYNOS_FPS_CHANGE_NOTIFY)
+	/* display LCD fps change notifier */
+	struct atomic_notifier_head fps_change_notifier_list;
+#endif
 	int color_mode;
 
 #if defined(CONFIG_EXYNOS_COMMON_PANEL)
@@ -1431,10 +1437,6 @@ struct decon_device {
 	int leak_cnt;
 #endif
 
-#if IS_ENABLED(CONFIG_EXYNOS_FPS_CHANGE_NOTIFY)
-	/* display LCD fps change notifier */
-	struct atomic_notifier_head fps_change_notifier_list;
-#endif
 };
 #ifdef CONFIG_EXYNOS_MCD_HDR
 
@@ -1907,12 +1909,18 @@ static inline void decon_set_bypass_global(u32 id, bool on)
 {
 	struct decon_device *decon = get_decon_drvdata(id);
 
+	if (!decon)
+		return;
+
 	decon_set_bypass(decon, on);
 }
 
 static inline void decon_bypass_on_global(u32 id)
 {
 	struct decon_device *decon = get_decon_drvdata(id);
+
+	if (!decon)
+		return;
 
 	decon_bypass_on(decon);
 }
@@ -1921,7 +1929,20 @@ static inline void decon_bypass_off_global(u32 id)
 {
 	struct decon_device *decon = get_decon_drvdata(id);
 
+	if (!decon)
+		return;
+
 	decon_bypass_off(decon);
+}
+
+static inline int decon_get_bypass_cnt_global(u32 id)
+{
+	struct decon_device *decon = get_decon_drvdata(id);
+
+	if (!decon)
+		return -EINVAL;
+
+	return atomic_read(&decon->bypass);
 }
 
 int decon_reset_panel(struct decon_device *decon);
@@ -2005,6 +2026,7 @@ void dpu_unify_rect(struct decon_rect *r1, struct decon_rect *r2,
 		struct decon_rect *dst);
 void dpu_save_fence_info(int fd, struct dma_fence *fence,
 		struct dpu_fence_info *fence_info);
+void dpu_show_readback_buf_info(struct decon_device *decon, u32 diff_cnt);
 void dpu_show_dma_attach_info(char *fn, struct decon_device *decon, u32 sel);
 
 void decon_dump(struct decon_device *decon, bool panel_dump);
@@ -2135,6 +2157,7 @@ int _decon_enable(struct decon_device *decon, enum decon_state state);
 #ifdef CONFIG_EXYNOS_SET_ACTIVE
 /* Display Mode Support */
 #define EXYNOS_GET_DISPLAY_MODE_NUM	_IOW('F', 700, u32)
+#define EXYNOS_GET_DISPLAY_MODE_OLD		_IOW('F', 701, struct exynos_display_mode_old)
 #define EXYNOS_GET_DISPLAY_MODE		_IOW('F', 701, struct exynos_display_mode)
 #define EXYNOS_GET_DISPLAY_CURRENT_MODE _IOW('F', 705, u32)
 #endif
