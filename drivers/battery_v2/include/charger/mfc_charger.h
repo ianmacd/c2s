@@ -24,13 +24,13 @@
 #include <linux/alarmtimer.h>
 #include "../sec_charging_common.h"
 
-#define MFC_FW_BIN_VERSION			0x142
-#define MFC_FW_BIN_FULL_VERSION		0x01420000
+#define MFC_FW_BIN_VERSION			0x144
+#define MFC_FW_BIN_FULL_VERSION		0x01440000
 #define MFC_FW_BIN_VERSION_ADDR		0x0084 //fw rev85 address
 #define MTP_MAX_PROGRAM_SIZE 0x4000
 #define MTP_VERIFY_ADDR			0x0000
 #define MTP_VERIFY_SIZE			0x4680
-#define MTP_VERIFY_CHKSUM		0xC068
+#define MTP_VERIFY_CHKSUM		0x0274
 
 #define MFC_FLASH_FW_HEX_PATH		"mfc/mfc_fw_flash.bin"
 #define MFC_FW_SDCARD_BIN_PATH		"/sdcard/mfc_fw_flash.bin"
@@ -1216,5 +1216,9 @@ struct mfc_charger_data {
 	u8 ping_freq;
 	bool req_afc_tx;
 #endif
+
+	struct mutex fw_lock;
+	unsigned long fw_size;
+	u8 *fw_img;
 };
 #endif /* __WIRELESS_CHARGER_MFC_H */
