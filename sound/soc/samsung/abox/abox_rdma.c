@@ -1394,8 +1394,8 @@ static int abox_rdma_hw_params(struct snd_pcm_substream *substream,
 		runtime->dma_bytes = params_buffer_bytes(params);
 	} else {
 		dev_dbg(dev, "backend dai mode\n");
-		data->backend = true;
 	}
+	data->backend = abox_rdma_backend(substream);
 
 	sbank_size = abox_cmpnt_adjust_sbank(data->abox_data,
 			cpu_dai->id, params);
@@ -1486,7 +1486,6 @@ static int abox_rdma_hw_free(struct snd_pcm_substream *substream)
 
 	if (cpu_dai->id < ABOX_RDMA0_BE)
 		snd_pcm_set_runtime_buffer(substream, NULL);
-	data->backend = false;
 
 	return 0;
 }

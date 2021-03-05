@@ -458,9 +458,11 @@ static void exynos_bcm_calc_work_func(struct work_struct *work)
 	struct exynos_bcm_calc *bcm_calc = bcm_dbg_data->bcm_calc;
 
 	mutex_lock(&bcm_calc->lock);
-	exynos_bcm_find_dump_data(bcm_calc->data);
-	schedule_delayed_work(&bcm_calc->work,
+	if (bcm_calc->enable) {
+		exynos_bcm_find_dump_data(bcm_calc->data);
+		schedule_delayed_work(&bcm_calc->work,
 			msecs_to_jiffies(bcm_calc->sample_time));
+	}
 	mutex_unlock(&bcm_calc->lock);
 }
 
@@ -470,8 +472,23 @@ bool exynos_bcm_calc_enable(int enable)
 	struct exynos_bcm_calc *bcm_calc = data->bcm_calc;
 	int ret;
 
-	if (enable == bcm_calc->enable)
+	mutex_lock(&bcm_calc->lock);
+	if (enable) {
+		bcm_calc->usage_cnt++;
+	} else if (!enable && bcm_calc->usage_cnt) {
+		bcm_calc->usage_cnt--;
+	} else {
+		mutex_unlock(&bcm_calc->lock);
 		return bcm_calc->enable;
+	}
+
+	/* en_cnt == 0(disable) or first enable */
+	if (bcm_calc->usage_cnt > 1 ||
+			(bcm_calc->usage_cnt == 1 && !enable)) {
+		mutex_unlock(&bcm_calc->lock);
+		return 0;
+	}
+	mutex_unlock(&bcm_calc->lock);
 
 	/* Initalize BCM Plugin */
 
@@ -513,14 +530,14 @@ bool exynos_bcm_calc_enable(int enable)
 EXPORT_SYMBOL(exynos_bcm_calc_enable);
 
 void exynos_bcm_get_data(u64 *freq_stats0, u64 *freq_stats1, u64
-		*rdata_latency_sum, u64 *freq_stats3)
+		*freq_stats2, u64 *freq_stats3)
 {
 	struct exynos_bcm_calc *bcm_calc = bcm_dbg_data->bcm_calc;
 	int i;
 
 	*freq_stats0 = 0;
 	*freq_stats1 = 0;
-	*rdata_latency_sum = 0;
+	*freq_stats2 = 0;
 
 	if (bcm_calc &&	bcm_calc->sample_time) {
 		mutex_lock(&bcm_calc->lock);
@@ -538,7 +555,7 @@ void exynos_bcm_get_data(u64 *freq_stats0, u64 *freq_stats1, u64
 				bcm_calc->acc_data[0].pmcnt[0]
 				+ bcm_calc->acc_data[1].pmcnt[0];
 
-			*rdata_latency_sum =
+			*freq_stats2 =
 				bcm_calc->acc_data[0].pmcnt[6]
 				+ bcm_calc->acc_data[1].pmcnt[6];
 			*freq_stats3 =
@@ -3861,6 +3878,7 @@ static int exynos_bcm_dbg_remove(struct platform_device *pdev)
 	}
 
 	exynos_bcm_dbg_ipc_channel_release(data);
+	kfree(data->bcm_calc);
 	kfree(data);
 	data = NULL;
 
