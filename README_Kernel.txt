@@ -2,7 +2,7 @@
 
 1. Download and unzip the kernel source of N986BXXU2DUF8.
 
-2. Unzip and update the kernel source of N986BXXU3DUH2.
+2. Unzip and update the kernel source of N986BXXS3DUJ6.
 
 3. How to Build
         - get Toolchain
